@@ -10,6 +10,21 @@ const HEIGHT: usize = 600;
 
 const DIFFUSION: f64 = 0.1;
 
+fn create_cell_square(
+    start_x: usize,
+    start_y: usize,
+    square_size: usize,
+    intensity: f64,
+    grid: &mut grid::Grid,
+) {
+    for y in start_y..(start_y + square_size) {
+        for x in start_x..(start_x + square_size) {
+            let idx = y * grid.grid_width + x;
+            grid.concentrations[idx] = intensity.clamp(0.0, 1.0);
+        }
+    }
+}
+
 fn main() {
     let bg_colour: Colour = Colour::new(0, 0, 0);
 
@@ -28,12 +43,10 @@ fn main() {
     window.set_target_fps(60);
 
     let mut grid = grid::Grid::new(WIDTH, HEIGHT, 1);
-    for y in 200..210 {
-        for x in 300..310 {
-            let idx = y * grid.grid_width + x;
-            grid.concentrations[idx] = 1.0;
-        }
-    }
+    create_cell_square(200, 300, 10, 0.75, &mut grid);
+    create_cell_square(100, 90, 5, 1.0, &mut grid);
+    create_cell_square(600, 420, 20, 0.5, &mut grid);
+
     let delta = 2.5;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
