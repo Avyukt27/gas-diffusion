@@ -1,6 +1,10 @@
+use crate::colour::Colour;
+
 pub struct Grid {
-    pub width: usize,
-    pub height: usize,
+    pub screen_width: usize,
+    pub screen_height: usize,
+    pub grid_width: usize,
+    pub grid_height: usize,
     pub cell_size: usize,
     pub concentrations: Vec<f64>,
 }
@@ -11,12 +15,30 @@ impl Grid {
         let grid_height = height / cell_size;
 
         Self {
-            width,
-            height,
+            screen_width: width,
+            screen_height: height,
+            grid_width,
+            grid_height,
             cell_size,
             concentrations: vec![0.0; grid_width * grid_height],
         }
     }
 
-    pub fn draw(buffer: &mut Vec<u32>) {}
+    pub fn draw(&self, buffer: &mut Vec<u32>) {
+        for y in 0..self.grid_height {
+            for x in 0..self.grid_width {
+                let concentration = self.concentrations[y * self.grid_width + x];
+                let intensity = (concentration.clamp(0.0, 1.0) * 255.0) as u8;
+                let colour = Colour::new(intensity, intensity, intensity).to_u32();
+
+                for dy in 0..self.cell_size {
+                    for dx in 0..self.cell_size {
+                        let pixel_x = x * self.cell_size + dx;
+                        let pixel_y = y * self.cell_size + dy;
+                        buffer[pixel_y * self.screen_width + pixel_x] = colour;
+                    }
+                }
+            }
+        }
+    }
 }
