@@ -41,4 +41,31 @@ impl Grid {
             }
         }
     }
+
+    fn get_neighbors(&self, idx: usize) -> [Option<f64>; 4] {
+        let x = idx % self.grid_width;
+        let y = idx / self.grid_height;
+
+        let left = if x > 0 {
+            Some(self.concentrations[idx - 1])
+        } else {
+            None
+        };
+        let right = if x + 1 < self.grid_width {
+            Some(self.concentrations[idx + 1])
+        } else {
+            None
+        };
+        let up = if y > 0 {
+            Some(self.concentrations[idx - self.grid_width])
+        } else {
+            None
+        };
+        let down = if y + 1 < self.grid_height {
+            Some(self.concentrations[idx + self.grid_width])
+        } else {
+            None
+        };
+        [left, right, up, down]
+    }
 }

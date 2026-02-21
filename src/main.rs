@@ -29,7 +29,7 @@ fn main() {
 
     window.set_target_fps(60);
 
-    let mut grid = grid::Grid::new(WIDTH, HEIGHT, 1);
+    let mut grid = grid::Grid::new(WIDTH, HEIGHT, 10);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         for i in buffer.iter_mut() {
