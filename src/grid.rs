@@ -25,9 +25,7 @@ impl Grid {
     pub fn draw(&self, buffer: &mut Vec<u32>) {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
-                let concentration = self.concentrations[y * self.grid_width + x];
-                let intensity = (concentration.clamp(0.0, 1.0) * 255.0) as u8;
-                let colour = Colour::new(intensity, intensity, intensity).to_u32();
+                let colour = self.generate_heatmap(y * self.grid_width + x);
 
                 for dy in 0..self.cell_size {
                     for dx in 0..self.cell_size {
@@ -88,5 +86,39 @@ impl Grid {
             None
         };
         [left, right, up, down]
+    }
+
+    fn generate_heatmap(&self, idx: usize) -> u32 {
+        let concentration = self.concentrations[idx].clamp(0.0, 1.0);
+
+        let stops = [
+            (0.0000001, Colour::new(0, 0, 75)),
+            (0.25, Colour::new(0, 204, 255)),
+            (0.5, Colour::new(0, 255, 0)),
+            (0.75, Colour::new(255, 255, 0)),
+            (1.0, Colour::new(255, 0, 0)),
+        ];
+
+        for i in 0..(stops.len() - 1) {
+            let (concentration0, colour0) = stops[i];
+            let (concentration1, colour1) = stops[i + 1];
+
+            if concentration >= concentration0 && concentration < concentration1 {
+                let a = (concentration - concentration0) / (concentration1 - concentration0);
+
+                let r = self.lerp(colour0.red as f64, colour1.red as f64, a);
+                let g = self.lerp(colour0.green as f64, colour1.green as f64, a);
+                let b = self.lerp(colour0.blue as f64, colour1.blue as f64, a);
+
+                return Colour::new((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
+                    .to_u32();
+            }
+        }
+
+        Colour::new(0, 0, 0).to_u32()
+    }
+
+    fn lerp(&self, a: f64, b: f64, t: f64) -> f64 {
+        a + (b - a) * t
     }
 }

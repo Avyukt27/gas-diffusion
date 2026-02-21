@@ -45,7 +45,7 @@ fn main() {
     let mut grid = grid::Grid::new(WIDTH, HEIGHT, 1);
     create_cell_square(200, 300, 10, 0.75, &mut grid);
     create_cell_square(100, 90, 5, 1.0, &mut grid);
-    create_cell_square(600, 420, 20, 0.5, &mut grid);
+    create_cell_square(600, 420, 20, 1.0, &mut grid);
 
     let delta = 2.5;
 
