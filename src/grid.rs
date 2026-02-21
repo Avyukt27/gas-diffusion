@@ -2,7 +2,6 @@ use crate::colour::Colour;
 
 pub struct Grid {
     pub screen_width: usize,
-    pub screen_height: usize,
     pub grid_width: usize,
     pub grid_height: usize,
     pub cell_size: usize,
@@ -16,7 +15,6 @@ impl Grid {
 
         Self {
             screen_width: width,
-            screen_height: height,
             grid_width,
             grid_height,
             cell_size,
@@ -42,27 +40,50 @@ impl Grid {
         }
     }
 
+    pub fn update(&mut self, diffusion_coefficient: f64, delta: f64) {
+        let mut next = self.concentrations.clone();
+
+        for y in 0..self.grid_height {
+            for x in 0..self.grid_width {
+                let idx = y * self.grid_width + x;
+
+                let concentration = self.concentrations[idx];
+                let neighbor_sum: f64 = self
+                    .get_neighbors(idx)
+                    .into_iter()
+                    .map(|v| v.unwrap_or(concentration))
+                    .sum();
+
+                next[idx] = concentration
+                    + diffusion_coefficient * delta * (neighbor_sum - 4.0 * concentration)
+                        / (self.cell_size * self.cell_size) as f64;
+            }
+        }
+
+        self.concentrations = next;
+    }
+
     fn get_neighbors(&self, idx: usize) -> [Option<f64>; 4] {
         let x = idx % self.grid_width;
-        let y = idx / self.grid_height;
+        let y = idx / self.grid_width;
 
         let left = if x > 0 {
-            Some(self.concentrations[idx - 1])
+            Some(self.concentrations[y * self.grid_width + (x - 1)])
         } else {
             None
         };
         let right = if x + 1 < self.grid_width {
-            Some(self.concentrations[idx + 1])
+            Some(self.concentrations[y * self.grid_width + (x + 1)])
         } else {
             None
         };
         let up = if y > 0 {
-            Some(self.concentrations[idx - self.grid_width])
+            Some(self.concentrations[(y - 1) * self.grid_width + x])
         } else {
             None
         };
         let down = if y + 1 < self.grid_height {
-            Some(self.concentrations[idx + self.grid_width])
+            Some(self.concentrations[(y + 1) * self.grid_width + x])
         } else {
             None
         };
