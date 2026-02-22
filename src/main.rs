@@ -11,6 +11,12 @@ const HEIGHT: usize = 600;
 
 const DIFFUSION: f64 = 2.0;
 
+enum DrawMode {
+    GAS,
+    SOURCE,
+    SINK,
+}
+
 fn create_cells(
     start_x: usize,
     start_y: usize,
@@ -31,6 +37,7 @@ fn create_source(x: usize, y: usize, rate: f64, grid: &mut grid::Grid) {
     grid.sources.push(source::Source { x, y, rate });
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
     let bg_colour: Colour = Colour::new(0, 0, 0);
 
@@ -132,10 +139,4 @@ fn main() {
 
         window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
     }
-}
-
-enum DrawMode {
-    GAS,
-    SOURCE,
-    SINK,
 }
