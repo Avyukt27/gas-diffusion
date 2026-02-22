@@ -102,8 +102,6 @@ impl ApplicationHandler for App {
 
         self.window = Some(window.clone());
         self.pixels = Some(pixels);
-
-        self.apply_brush(0, 0, 40, 30);
     }
 
     fn window_event(
