@@ -55,16 +55,36 @@ fn main() {
 
     let mut mouse_intensity = 1.0;
     let mut mouse_size: usize = 1;
+    let mut mouse_mode = DrawMode::GAS;
 
     let delta = 1.0;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        if window.get_mouse_down(minifb::MouseButton::Right) {
-            mouse_intensity -= 0.25;
-            if mouse_intensity <= 0.0 {
-                mouse_intensity = 1.0;
-            }
-        }
+        window
+            .get_keys_pressed(minifb::KeyRepeat::No)
+            .iter()
+            .for_each(|key| match key {
+                Key::Space => {
+                    mouse_mode = match mouse_mode {
+                        DrawMode::GAS => DrawMode::SOURCE,
+                        DrawMode::SOURCE => DrawMode::SINK,
+                        DrawMode::SINK => DrawMode::GAS,
+                    }
+                }
+                Key::Up => {
+                    mouse_intensity += 0.25;
+                    if mouse_intensity >= 1.0 {
+                        mouse_intensity = 1.0;
+                    }
+                }
+                Key::Down => {
+                    mouse_intensity -= 0.25;
+                    if mouse_intensity <= 0.0 {
+                        mouse_intensity = 0.0;
+                    }
+                }
+                _ => (),
+            });
 
         if let Some(mouse_scroll) = window.get_scroll_wheel() {
             if mouse_scroll.1 < 0.0 {
@@ -77,14 +97,19 @@ fn main() {
         if window.get_mouse_down(minifb::MouseButton::Left)
             && let Some(mouse_pos) = window.get_mouse_pos(minifb::MouseMode::Discard)
         {
-            create_cells(
-                mouse_pos.0 as usize / grid.cell_size,
-                mouse_pos.1 as usize / grid.cell_size,
-                mouse_size,
-                mouse_size,
-                mouse_intensity,
-                &mut grid,
-            );
+            match mouse_mode {
+                DrawMode::GAS => {
+                    create_cells(
+                        mouse_pos.0 as usize / grid.cell_size,
+                        mouse_pos.1 as usize / grid.cell_size,
+                        mouse_size,
+                        mouse_size,
+                        mouse_intensity,
+                        &mut grid,
+                    );
+                }
+                _ => {}
+            }
         }
 
         grid.update(DIFFUSION, delta);
@@ -97,4 +122,10 @@ fn main() {
 
         window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
     }
+}
+
+enum DrawMode {
+    GAS,
+    SOURCE,
+    SINK,
 }
