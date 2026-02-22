@@ -4,7 +4,7 @@ use pixels::{Pixels, SurfaceTexture};
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalPosition,
-    event::{KeyEvent, MouseButton, WindowEvent},
+    event::{KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::EventLoop,
     keyboard::{Key, NamedKey},
     window::{Window, WindowAttributes},
@@ -188,6 +188,18 @@ impl ApplicationHandler for App {
                         self.draw_size,
                         self.draw_size,
                     );
+                }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let scroll_y = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => y as f64,
+                    MouseScrollDelta::PixelDelta(pos) => pos.y / 50.0,
+                };
+
+                if scroll_y > 0.0 {
+                    self.draw_size += 1;
+                } else if scroll_y < 0.0 && self.draw_size > 1 {
+                    self.draw_size -= 1;
                 }
             }
             _ => {}
