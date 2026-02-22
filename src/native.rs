@@ -1,4 +1,11 @@
-use minifb::{Key, Window, WindowOptions};
+use std::sync::Arc;
+
+use pixels::{Pixels, SurfaceTexture};
+use winit::{
+    application::ApplicationHandler,
+    event::WindowEvent,
+    window::{Window, WindowAttributes},
+};
 
 use crate::{colour::Colour, grid::Grid, source::Source};
 
@@ -49,6 +56,53 @@ fn apply_brush(
         }
     }
 }
+
+struct App {
+    window: Option<Arc<Window>>,
+    pixels: Option<Pixels<'static>>,
+}
+
+impl App {
+    pub fn new() -> Self {
+        Self {
+            window: None,
+            pixels: None,
+        }
+    }
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let window = event_loop
+            .create_window(
+                WindowAttributes::default()
+                    .with_title("Diffusion Simulation Window")
+                    .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64)),
+            )
+            .unwrap();
+
+        let window = Arc::new(window);
+
+        let surface = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, window.clone());
+        let pixels = Pixels::new(WIDTH as u32, HEIGHT as u32, surface).unwrap();
+
+        self.window = Some(window);
+        self.pixels = Some(pixels);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        window_id: winit::window::WindowId,
+        event: winit::event::WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            _ => {}
+        }
+    }
+}
+
 pub fn run() {
     let bg_colour: Colour = Colour::new(0, 0, 0);
 
