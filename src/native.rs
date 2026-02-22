@@ -21,47 +21,12 @@ enum DrawMode {
     SINK,
 }
 
-fn apply_brush(
-    start_x: usize,
-    start_y: usize,
-    width: usize,
-    height: usize,
-    intensity: f64,
-    grid: &mut Grid,
-    mode: &DrawMode,
-) {
-    for y in start_y..(start_y + height).min(grid.grid_height) {
-        for x in start_x..(start_x + width).min(grid.grid_width) {
-            let idx = y * grid.grid_width + x;
-            match mode {
-                DrawMode::GAS => {
-                    grid.concentrations[idx] = intensity.clamp(0.0, 1.0);
-                }
-
-                DrawMode::SOURCE => {
-                    grid.sources.push(Source {
-                        x,
-                        y,
-                        rate: intensity.abs() / 100.0,
-                    });
-                }
-
-                DrawMode::SINK => {
-                    grid.sources.push(Source {
-                        x,
-                        y,
-                        rate: -intensity.abs() / 100.0,
-                    });
-                }
-            }
-        }
-    }
-}
-
 struct App {
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
     grid: Grid,
+    draw_mode: DrawMode,
+    draw_intensity: f64,
 }
 
 impl App {
@@ -70,6 +35,37 @@ impl App {
             window: None,
             pixels: None,
             grid: Grid::new(WIDTH, HEIGHT, 10),
+            draw_mode: DrawMode::GAS,
+            draw_intensity: 1.0,
+        }
+    }
+
+    fn apply_brush(&mut self, start_x: usize, start_y: usize, width: usize, height: usize) {
+        for y in start_y..(start_y + height).min(self.grid.grid_height) {
+            for x in start_x..(start_x + width).min(self.grid.grid_width) {
+                let idx = y * self.grid.grid_width + x;
+                match self.draw_mode {
+                    DrawMode::GAS => {
+                        self.grid.concentrations[idx] = self.draw_intensity.clamp(0.0, 1.0);
+                    }
+
+                    DrawMode::SOURCE => {
+                        self.grid.sources.push(Source {
+                            x,
+                            y,
+                            rate: self.draw_intensity.abs() / 100.0,
+                        });
+                    }
+
+                    DrawMode::SINK => {
+                        self.grid.sources.push(Source {
+                            x,
+                            y,
+                            rate: -self.draw_intensity.abs() / 100.0,
+                        });
+                    }
+                }
+            }
         }
     }
 }
@@ -103,8 +99,8 @@ impl ApplicationHandler for App {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
                 if let Some(pixels) = &mut self.pixels {
-                    pixels.resize_surface(size.width, size.height);
-                    pixels.resize_buffer(size.width, size.height);
+                    pixels.resize_surface(size.width, size.height).unwrap();
+                    pixels.resize_buffer(size.width, size.height).unwrap();
                 }
             }
             WindowEvent::RedrawRequested => {
@@ -118,6 +114,7 @@ impl ApplicationHandler for App {
                         pixel[2] = bg_colour.blue;
                         pixel[3] = bg_colour.alpha;
                     }
+                    self.grid.draw(frame);
                     pixels.render().unwrap();
                 }
 
