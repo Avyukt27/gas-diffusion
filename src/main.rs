@@ -4,11 +4,12 @@ use crate::colour::Colour;
 
 mod colour;
 mod grid;
+mod source;
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
 
-const DIFFUSION: f64 = 0.5;
+const DIFFUSION: f64 = 2.0;
 
 fn create_cells(
     start_x: usize,
@@ -24,6 +25,10 @@ fn create_cells(
             grid.concentrations[idx] = intensity.clamp(0.0, 1.0);
         }
     }
+}
+
+fn create_source(x: usize, y: usize, rate: f64, grid: &mut grid::Grid) {
+    grid.sources.push(source::Source { x, y, rate });
 }
 
 fn main() {
@@ -44,20 +49,39 @@ fn main() {
     window.set_target_fps(120);
 
     let mut grid = grid::Grid::new(WIDTH, HEIGHT, 10);
-    create_cells(0, 0, 40, 60, 0.25, &mut grid);
 
     let mut mouse_intensity = 1.0;
     let mut mouse_size: usize = 1;
+    let mut mouse_mode = DrawMode::GAS;
 
-    let delta = 50.0;
+    let delta = 1.0;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        if window.get_mouse_down(minifb::MouseButton::Right) {
-            mouse_intensity -= 0.25;
-            if mouse_intensity <= 0.0 {
-                mouse_intensity = 1.0;
-            }
-        }
+        window
+            .get_keys_pressed(minifb::KeyRepeat::No)
+            .iter()
+            .for_each(|key| match key {
+                Key::Space => {
+                    mouse_mode = match mouse_mode {
+                        DrawMode::GAS => DrawMode::SOURCE,
+                        DrawMode::SOURCE => DrawMode::SINK,
+                        DrawMode::SINK => DrawMode::GAS,
+                    }
+                }
+                Key::Up => {
+                    mouse_intensity += 0.25;
+                    if mouse_intensity >= 1.0 {
+                        mouse_intensity = 1.0;
+                    }
+                }
+                Key::Down => {
+                    mouse_intensity -= 0.25;
+                    if mouse_intensity <= 0.0 {
+                        mouse_intensity = 0.0;
+                    }
+                }
+                _ => (),
+            });
 
         if let Some(mouse_scroll) = window.get_scroll_wheel() {
             if mouse_scroll.1 < 0.0 {
@@ -70,14 +94,28 @@ fn main() {
         if window.get_mouse_down(minifb::MouseButton::Left)
             && let Some(mouse_pos) = window.get_mouse_pos(minifb::MouseMode::Discard)
         {
-            create_cells(
-                mouse_pos.0 as usize / grid.cell_size,
-                mouse_pos.1 as usize / grid.cell_size,
-                mouse_size,
-                mouse_size,
-                mouse_intensity,
-                &mut grid,
-            );
+            match mouse_mode {
+                DrawMode::GAS => create_cells(
+                    mouse_pos.0 as usize / grid.cell_size,
+                    mouse_pos.1 as usize / grid.cell_size,
+                    mouse_size,
+                    mouse_size,
+                    mouse_intensity,
+                    &mut grid,
+                ),
+                DrawMode::SOURCE => create_source(
+                    mouse_pos.0 as usize / grid.cell_size,
+                    mouse_pos.1 as usize / grid.cell_size,
+                    mouse_intensity / 100.0,
+                    &mut grid,
+                ),
+                DrawMode::SINK => create_source(
+                    mouse_pos.0 as usize / grid.cell_size,
+                    mouse_pos.1 as usize / grid.cell_size,
+                    -mouse_intensity / 100.0,
+                    &mut grid,
+                ),
+            }
         }
 
         grid.update(DIFFUSION, delta);
@@ -90,4 +128,10 @@ fn main() {
 
         window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
     }
+}
+
+enum DrawMode {
+    GAS,
+    SOURCE,
+    SINK,
 }
