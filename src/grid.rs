@@ -29,11 +29,18 @@ impl Grid {
             for x in 0..self.grid_width {
                 let colour = self.generate_heatmap(y * self.grid_width + x);
 
-                for pixel in buffer.chunks_exact_mut(4) {
-                    pixel[0] = colour.red;
-                    pixel[1] = colour.green;
-                    pixel[2] = colour.blue;
-                    pixel[3] = colour.alpha;
+                for dy in 0..self.cell_size {
+                    for dx in 0..self.cell_size {
+                        let pixel_x = x * self.cell_size + dx;
+                        let pixel_y = y * self.cell_size + dy;
+
+                        let idx = (pixel_y * self.screen_width + pixel_x) * 4;
+
+                        buffer[idx] = colour.red;
+                        buffer[idx + 1] = colour.green;
+                        buffer[idx + 2] = colour.blue;
+                        buffer[idx + 3] = colour.alpha;
+                    }
                 }
             }
         }

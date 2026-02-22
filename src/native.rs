@@ -12,8 +12,8 @@ use crate::{colour::Colour, grid::Grid, source::Source};
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
-
 const DIFFUSION: f64 = 2.0;
+const DELTA: f64 = 1.0;
 
 enum DrawMode {
     GAS,
@@ -85,8 +85,10 @@ impl ApplicationHandler for App {
         let surface = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, window.clone());
         let pixels = Pixels::new(WIDTH as u32, HEIGHT as u32, surface).unwrap();
 
-        self.window = Some(window);
+        self.window = Some(window.clone());
         self.pixels = Some(pixels);
+
+        self.apply_brush(0, 0, 40, 30);
     }
 
     fn window_event(
@@ -105,6 +107,8 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 let bg_colour: Colour = Colour::new(0, 0, 0, 255);
+
+                self.grid.update(DIFFUSION, DELTA);
 
                 if let Some(pixels) = &mut self.pixels {
                     let frame = pixels.frame_mut();
