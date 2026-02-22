@@ -46,17 +46,35 @@ fn main() {
     create_cell_square(10, 9, 5, 0.5, &mut grid);
     create_cell_square(50, 40, 20, 0.5, &mut grid);
 
+    let mut mouse_intensity = 1.0;
+    let mut mouse_size: usize = 1;
+
     let delta = 2.5;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
+        if window.get_mouse_down(minifb::MouseButton::Middle) {
+            mouse_intensity -= 0.25;
+            if mouse_intensity <= 0.0 {
+                mouse_intensity = 1.0;
+            }
+        }
+
+        if let Some(mouse_scroll) = window.get_scroll_wheel() {
+            if mouse_scroll.1 < 0.0 {
+                mouse_size += 1
+            } else if mouse_scroll.1 > 0.0 && mouse_size > 0 {
+                mouse_size -= 1
+            }
+        }
+
         if window.get_mouse_down(minifb::MouseButton::Left)
             && let Some(mouse_pos) = window.get_mouse_pos(minifb::MouseMode::Discard)
         {
             create_cell_square(
                 mouse_pos.0 as usize / grid.cell_size,
                 mouse_pos.1 as usize / grid.cell_size,
-                5,
-                1.0,
+                mouse_size,
+                mouse_intensity,
                 &mut grid,
             );
         }
