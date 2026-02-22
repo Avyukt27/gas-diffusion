@@ -102,6 +102,9 @@ impl Grid {
 
     fn generate_heatmap(&self, idx: usize) -> u32 {
         let concentration = self.concentrations[idx].clamp(0.0, 1.0);
+        if idx == (30 * self.grid_width + 40) {
+            println!("{}", concentration)
+        };
 
         let stops = [
             (0.0000001, Colour::new(0, 0, 75)),
@@ -115,7 +118,7 @@ impl Grid {
             let (concentration0, colour0) = stops[i];
             let (concentration1, colour1) = stops[i + 1];
 
-            if concentration >= concentration0 && concentration < concentration1 {
+            if concentration >= concentration0 && concentration <= concentration1 {
                 let a = (concentration - concentration0) / (concentration1 - concentration0);
 
                 let r = self.lerp(colour0.red as f64, colour1.red as f64, a);

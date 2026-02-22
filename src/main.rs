@@ -49,8 +49,9 @@ fn main() {
     window.set_target_fps(120);
 
     let mut grid = grid::Grid::new(WIDTH, HEIGHT, 10);
-    create_cells(0, 0, 40, 60, 0.25, &mut grid);
-    create_source(40, 30, 5.0, &mut grid);
+    create_cells(0, 0, 40, 20, 0.25, &mut grid);
+    create_source(40, 30, 0.001, &mut grid);
+    create_source(0, 0, -0.0006, &mut grid);
 
     let mut mouse_intensity = 1.0;
     let mut mouse_size: usize = 1;
