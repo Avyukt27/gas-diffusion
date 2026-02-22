@@ -80,6 +80,10 @@ fn main() {
                         mouse_intensity = 0.0;
                     }
                 }
+                Key::C => {
+                    grid.sources.clear();
+                    grid.concentrations.fill(0.0);
+                }
                 _ => (),
             });
 

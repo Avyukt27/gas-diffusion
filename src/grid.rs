@@ -104,7 +104,7 @@ impl Grid {
         let concentration = self.concentrations[idx].clamp(0.0, 1.0);
 
         let stops = [
-            (0.0000001, Colour::new(0, 0, 75)),
+            (0.01, Colour::new(0, 0, 75)),
             (0.25, Colour::new(0, 204, 255)),
             (0.5, Colour::new(0, 255, 0)),
             (0.75, Colour::new(255, 255, 0)),
