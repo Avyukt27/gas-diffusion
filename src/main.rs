@@ -4,6 +4,7 @@ use crate::colour::Colour;
 
 mod colour;
 mod grid;
+mod source;
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
@@ -26,6 +27,10 @@ fn create_cells(
     }
 }
 
+fn create_source(x: usize, y: usize, rate: f64, grid: &mut grid::Grid) {
+    grid.sources.push(source::Source { x, y, rate });
+}
+
 fn main() {
     let bg_colour: Colour = Colour::new(0, 0, 0);
 
@@ -45,11 +50,12 @@ fn main() {
 
     let mut grid = grid::Grid::new(WIDTH, HEIGHT, 10);
     create_cells(0, 0, 40, 60, 0.25, &mut grid);
+    create_source(40, 30, 5.0, &mut grid);
 
     let mut mouse_intensity = 1.0;
     let mut mouse_size: usize = 1;
 
-    let delta = 50.0;
+    let delta = 1.0;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if window.get_mouse_down(minifb::MouseButton::Right) {

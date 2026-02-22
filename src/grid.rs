@@ -1,4 +1,4 @@
-use crate::colour::Colour;
+use crate::{colour::Colour, source::Source};
 
 pub struct Grid {
     pub screen_width: usize,
@@ -6,6 +6,7 @@ pub struct Grid {
     pub grid_height: usize,
     pub cell_size: usize,
     pub concentrations: Vec<f64>,
+    pub sources: Vec<Source>,
 }
 
 impl Grid {
@@ -19,6 +20,7 @@ impl Grid {
             grid_height,
             cell_size,
             concentrations: vec![0.0; grid_width * grid_height],
+            sources: vec![],
         }
     }
 
@@ -49,12 +51,22 @@ impl Grid {
                 let neighbor_sum: f64 = self
                     .get_neighbors(idx)
                     .into_iter()
-                    .map(|v| v.unwrap_or(concentration))
+                    .map(|v| v.unwrap_or(0.0))
                     .sum();
 
-                next[idx] = concentration
+                let mut source_contribution = 0.0;
+
+                for source in &self.sources {
+                    if source.x == x && source.y == y {
+                        source_contribution += source.rate * delta;
+                    }
+                }
+
+                next[idx] = (concentration
                     + diffusion_coefficient * delta * (neighbor_sum - 4.0 * concentration)
-                        / (self.cell_size * self.cell_size) as f64;
+                        / (self.cell_size * self.cell_size) as f64
+                    + source_contribution)
+                    .max(0.0);
             }
         }
 
@@ -110,8 +122,7 @@ impl Grid {
                 let g = self.lerp(colour0.green as f64, colour1.green as f64, a);
                 let b = self.lerp(colour0.blue as f64, colour1.blue as f64, a);
 
-                return Colour::new((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
-                    .to_u32();
+                return Colour::new(r as u8, g as u8, b as u8).to_u32();
             }
         }
 
