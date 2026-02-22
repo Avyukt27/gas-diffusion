@@ -8,17 +8,18 @@ mod grid;
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
 
-const DIFFUSION: f64 = 0.1;
+const DIFFUSION: f64 = 0.5;
 
-fn create_cell_square(
+fn create_cells(
     start_x: usize,
     start_y: usize,
-    square_size: usize,
+    width: usize,
+    height: usize,
     intensity: f64,
     grid: &mut grid::Grid,
 ) {
-    for y in start_y..(start_y + square_size).min(grid.grid_height) {
-        for x in start_x..(start_x + square_size).min(grid.grid_width) {
+    for y in start_y..(start_y + height).min(grid.grid_height) {
+        for x in start_x..(start_x + width).min(grid.grid_width) {
             let idx = y * grid.grid_width + x;
             grid.concentrations[idx] = intensity.clamp(0.0, 1.0);
         }
@@ -43,16 +44,15 @@ fn main() {
     window.set_target_fps(120);
 
     let mut grid = grid::Grid::new(WIDTH, HEIGHT, 10);
-    create_cell_square(10, 9, 5, 0.5, &mut grid);
-    create_cell_square(50, 40, 20, 0.5, &mut grid);
+    create_cells(0, 0, 40, 60, 0.25, &mut grid);
 
     let mut mouse_intensity = 1.0;
     let mut mouse_size: usize = 1;
 
-    let delta = 2.5;
+    let delta = 50.0;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        if window.get_mouse_down(minifb::MouseButton::Middle) {
+        if window.get_mouse_down(minifb::MouseButton::Right) {
             mouse_intensity -= 0.25;
             if mouse_intensity <= 0.0 {
                 mouse_intensity = 1.0;
@@ -70,9 +70,10 @@ fn main() {
         if window.get_mouse_down(minifb::MouseButton::Left)
             && let Some(mouse_pos) = window.get_mouse_pos(minifb::MouseMode::Discard)
         {
-            create_cell_square(
+            create_cells(
                 mouse_pos.0 as usize / grid.cell_size,
                 mouse_pos.1 as usize / grid.cell_size,
+                mouse_size,
                 mouse_size,
                 mouse_intensity,
                 &mut grid,
