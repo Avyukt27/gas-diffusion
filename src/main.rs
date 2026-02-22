@@ -98,17 +98,26 @@ fn main() {
             && let Some(mouse_pos) = window.get_mouse_pos(minifb::MouseMode::Discard)
         {
             match mouse_mode {
-                DrawMode::GAS => {
-                    create_cells(
-                        mouse_pos.0 as usize / grid.cell_size,
-                        mouse_pos.1 as usize / grid.cell_size,
-                        mouse_size,
-                        mouse_size,
-                        mouse_intensity,
-                        &mut grid,
-                    );
-                }
-                _ => {}
+                DrawMode::GAS => create_cells(
+                    mouse_pos.0 as usize / grid.cell_size,
+                    mouse_pos.1 as usize / grid.cell_size,
+                    mouse_size,
+                    mouse_size,
+                    mouse_intensity,
+                    &mut grid,
+                ),
+                DrawMode::SOURCE => create_source(
+                    mouse_pos.0 as usize / grid.cell_size,
+                    mouse_pos.1 as usize / grid.cell_size,
+                    mouse_intensity / 100.0,
+                    &mut grid,
+                ),
+                DrawMode::SINK => create_source(
+                    mouse_pos.0 as usize / grid.cell_size,
+                    mouse_pos.1 as usize / grid.cell_size,
+                    -mouse_intensity / 100.0,
+                    &mut grid,
+                ),
             }
         }
 
