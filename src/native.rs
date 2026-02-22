@@ -1,12 +1,54 @@
-use minifb::Window;
+use minifb::{Key, Window, WindowOptions};
 
-use crate::colour::Colour;
+use crate::{colour::Colour, grid::Grid, source::Source};
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
 
 const DIFFUSION: f64 = 2.0;
 
+enum DrawMode {
+    GAS,
+    SOURCE,
+    SINK,
+}
+
+fn apply_brush(
+    start_x: usize,
+    start_y: usize,
+    width: usize,
+    height: usize,
+    intensity: f64,
+    grid: &mut Grid,
+    mode: &DrawMode,
+) {
+    for y in start_y..(start_y + height).min(grid.grid_height) {
+        for x in start_x..(start_x + width).min(grid.grid_width) {
+            let idx = y * grid.grid_width + x;
+            match mode {
+                DrawMode::GAS => {
+                    grid.concentrations[idx] = intensity.clamp(0.0, 1.0);
+                }
+
+                DrawMode::SOURCE => {
+                    grid.sources.push(Source {
+                        x,
+                        y,
+                        rate: intensity.abs() / 100.0,
+                    });
+                }
+
+                DrawMode::SINK => {
+                    grid.sources.push(Source {
+                        x,
+                        y,
+                        rate: -intensity.abs() / 100.0,
+                    });
+                }
+            }
+        }
+    }
+}
 pub fn run() {
     let bg_colour: Colour = Colour::new(0, 0, 0);
 
@@ -24,7 +66,7 @@ pub fn run() {
     .unwrap_or_else(|e| panic!("{}", e));
     window.set_target_fps(120);
 
-    let mut grid = grid::Grid::new(WIDTH, HEIGHT, 10);
+    let mut grid = Grid::new(WIDTH, HEIGHT, 10);
 
     let mut mouse_intensity = 1.0;
     let mut mouse_size: usize = 1;
@@ -74,28 +116,15 @@ pub fn run() {
         if window.get_mouse_down(minifb::MouseButton::Left)
             && let Some(mouse_pos) = window.get_mouse_pos(minifb::MouseMode::Discard)
         {
-            match mouse_mode {
-                DrawMode::GAS => create_cells(
-                    mouse_pos.0 as usize / grid.cell_size,
-                    mouse_pos.1 as usize / grid.cell_size,
-                    mouse_size,
-                    mouse_size,
-                    mouse_intensity,
-                    &mut grid,
-                ),
-                DrawMode::SOURCE => create_source(
-                    mouse_pos.0 as usize / grid.cell_size,
-                    mouse_pos.1 as usize / grid.cell_size,
-                    mouse_intensity / 100.0,
-                    &mut grid,
-                ),
-                DrawMode::SINK => create_source(
-                    mouse_pos.0 as usize / grid.cell_size,
-                    mouse_pos.1 as usize / grid.cell_size,
-                    -mouse_intensity / 100.0,
-                    &mut grid,
-                ),
-            }
+            apply_brush(
+                mouse_pos.0 as usize / grid.cell_size,
+                mouse_pos.1 as usize / grid.cell_size,
+                mouse_size,
+                mouse_size,
+                mouse_intensity,
+                &mut grid,
+                &mouse_mode,
+            );
         }
 
         grid.update(DIFFUSION, delta);
