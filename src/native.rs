@@ -3,8 +3,10 @@ use std::sync::Arc;
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    dpi::PhysicalPosition,
+    event::{KeyEvent, MouseButton, WindowEvent},
     event_loop::EventLoop,
+    keyboard::{Key, NamedKey},
     window::{Window, WindowAttributes},
 };
 
@@ -15,6 +17,7 @@ const HEIGHT: usize = 600;
 const DIFFUSION: f64 = 2.0;
 const DELTA: f64 = 1.0;
 
+#[derive(PartialEq, Eq, Debug)]
 enum DrawMode {
     GAS,
     SOURCE,
@@ -26,7 +29,9 @@ struct App {
     pixels: Option<Pixels<'static>>,
     grid: Grid,
     draw_mode: DrawMode,
+    draw_size: usize,
     draw_intensity: f64,
+    mouse_position: PhysicalPosition<f64>,
 }
 
 impl App {
@@ -36,7 +41,9 @@ impl App {
             pixels: None,
             grid: Grid::new(WIDTH, HEIGHT, 10),
             draw_mode: DrawMode::GAS,
+            draw_size: 1,
             draw_intensity: 1.0,
+            mouse_position: PhysicalPosition::new(0.0, 0.0),
         }
     }
 
@@ -48,7 +55,6 @@ impl App {
                     DrawMode::GAS => {
                         self.grid.concentrations[idx] = self.draw_intensity.clamp(0.0, 1.0);
                     }
-
                     DrawMode::SOURCE => {
                         self.grid.sources.push(Source {
                             x,
@@ -56,7 +62,6 @@ impl App {
                             rate: self.draw_intensity.abs() / 100.0,
                         });
                     }
-
                     DrawMode::SINK => {
                         self.grid.sources.push(Source {
                             x,
@@ -124,6 +129,51 @@ impl ApplicationHandler for App {
 
                 if let Some(window) = &self.window {
                     window.request_redraw();
+                }
+            }
+            WindowEvent::KeyboardInput {
+                event: KeyEvent {
+                    logical_key, state, ..
+                },
+                ..
+            } => {
+                if state.is_pressed() {
+                    match logical_key {
+                        Key::Named(NamedKey::Space) => {
+                            if self.draw_mode == DrawMode::GAS {
+                                self.draw_mode = DrawMode::SOURCE;
+                            } else if self.draw_mode == DrawMode::SOURCE {
+                                self.draw_mode = DrawMode::SINK;
+                            } else if self.draw_mode == DrawMode::SINK {
+                                self.draw_mode = DrawMode::SINK;
+                            }
+                        }
+                        Key::Named(NamedKey::ArrowUp) => {
+                            self.draw_intensity = (self.draw_intensity + 0.25).clamp(0.0, 1.0)
+                        }
+                        Key::Named(NamedKey::ArrowDown) => {
+                            self.draw_intensity = (self.draw_intensity - 0.25).clamp(0.0, 1.0)
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => self.mouse_position = position,
+            WindowEvent::MouseInput { state, button, .. } => {
+                if state.is_pressed() {
+                    println!(
+                        "position: {:?}\nbutton: {:?}\nsize: {:?}\nmode: {:?}",
+                        self.mouse_position, button, self.draw_size, self.draw_mode
+                    );
+                    match button {
+                        MouseButton::Left => self.apply_brush(
+                            self.mouse_position.x as usize,
+                            self.mouse_position.y as usize,
+                            self.draw_size,
+                            self.draw_size,
+                        ),
+                        _ => {}
+                    }
                 }
             }
             _ => {}
