@@ -102,7 +102,7 @@ impl Grid {
 
     fn generate_heatmap(&self, idx: usize) -> u32 {
         let concentration = self.concentrations[idx].clamp(0.0, 1.0);
-        if idx == (30 * self.grid_width + 40) {
+        if idx == 0 {
             println!("{}", concentration)
         };
 
