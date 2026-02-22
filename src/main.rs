@@ -17,8 +17,8 @@ fn create_cell_square(
     intensity: f64,
     grid: &mut grid::Grid,
 ) {
-    for y in start_y..(start_y + square_size) {
-        for x in start_x..(start_x + square_size) {
+    for y in start_y..(start_y + square_size).min(grid.grid_height) {
+        for x in start_x..(start_x + square_size).min(grid.grid_width) {
             let idx = y * grid.grid_width + x;
             grid.concentrations[idx] = intensity.clamp(0.0, 1.0);
         }
@@ -40,17 +40,27 @@ fn main() {
         },
     )
     .unwrap_or_else(|e| panic!("{}", e));
-    window.set_target_fps(60);
+    window.set_target_fps(120);
 
     let mut grid = grid::Grid::new(WIDTH, HEIGHT, 1);
-    create_cell_square(200, 300, 10, 0.75, &mut grid);
-    create_cell_square(100, 90, 5, 1.0, &mut grid);
-    create_cell_square(600, 420, 20, 1.0, &mut grid);
+    create_cell_square(620, 400, 10, 0.75, &mut grid);
+    create_cell_square(100, 90, 5, 0.5, &mut grid);
+    create_cell_square(500, 400, 20, 1.0, &mut grid);
 
     let delta = 2.5;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        grid.update(DIFFUSION, delta);
+        if window.get_mouse_down(minifb::MouseButton::Left)
+            && let Some(mouse_pos) = window.get_mouse_pos(minifb::MouseMode::Discard)
+        {
+            create_cell_square(
+                mouse_pos.0 as usize / grid.cell_size,
+                mouse_pos.1 as usize / grid.cell_size,
+                10,
+                1.0,
+                &mut grid,
+            );
+        }
 
         for i in buffer.iter_mut() {
             *i = bg_colour.to_u32();
