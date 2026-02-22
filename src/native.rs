@@ -19,9 +19,9 @@ const DELTA: f64 = 1.0;
 
 #[derive(PartialEq, Eq, Debug)]
 enum DrawMode {
-    GAS,
-    SOURCE,
-    SINK,
+    Gas,
+    Source,
+    Sink,
 }
 
 struct App {
@@ -31,6 +31,7 @@ struct App {
     draw_mode: DrawMode,
     draw_size: usize,
     draw_intensity: f64,
+    mouse_down: bool,
     mouse_position: PhysicalPosition<f64>,
 }
 
@@ -40,34 +41,43 @@ impl App {
             window: None,
             pixels: None,
             grid: Grid::new(WIDTH, HEIGHT, 10),
-            draw_mode: DrawMode::GAS,
+            draw_mode: DrawMode::Gas,
             draw_size: 1,
             draw_intensity: 1.0,
+            mouse_down: false,
             mouse_position: PhysicalPosition::new(0.0, 0.0),
         }
     }
 
     fn apply_brush(&mut self, start_x: usize, start_y: usize, width: usize, height: usize) {
-        for y in start_y..(start_y + height).min(self.grid.grid_height) {
-            for x in start_x..(start_x + width).min(self.grid.grid_width) {
+        if start_x >= self.grid.grid_width || start_y >= self.grid.grid_height {
+            return;
+        }
+
+        let max_x = (start_x + width).min(self.grid.grid_width);
+        let max_y = (start_y + height).min(self.grid.grid_height);
+
+        for y in start_y..max_y {
+            for x in start_x..max_x {
                 let idx = y * self.grid.grid_width + x;
                 match self.draw_mode {
-                    DrawMode::GAS => {
+                    DrawMode::Gas => {
                         self.grid.concentrations[idx] = self.draw_intensity.clamp(0.0, 1.0);
                     }
-                    DrawMode::SOURCE => {
-                        self.grid.sources.push(Source {
-                            x,
-                            y,
-                            rate: self.draw_intensity.abs() / 100.0,
-                        });
-                    }
-                    DrawMode::SINK => {
-                        self.grid.sources.push(Source {
-                            x,
-                            y,
-                            rate: -self.draw_intensity.abs() / 100.0,
-                        });
+                    DrawMode::Source | DrawMode::Sink => {
+                        let rate = if matches!(self.draw_mode, DrawMode::Source) {
+                            self.draw_intensity.abs() / 100.0
+                        } else {
+                            -self.draw_intensity.abs() / 100.0
+                        };
+
+                        if let Some(existing) =
+                            self.grid.sources.iter_mut().find(|s| s.x == x && s.y == y)
+                        {
+                            existing.rate = rate;
+                        } else {
+                            self.grid.sources.push(Source { x, y, rate });
+                        }
                     }
                 }
             }
@@ -140,12 +150,12 @@ impl ApplicationHandler for App {
                 if state.is_pressed() {
                     match logical_key {
                         Key::Named(NamedKey::Space) => {
-                            if self.draw_mode == DrawMode::GAS {
-                                self.draw_mode = DrawMode::SOURCE;
-                            } else if self.draw_mode == DrawMode::SOURCE {
-                                self.draw_mode = DrawMode::SINK;
-                            } else if self.draw_mode == DrawMode::SINK {
-                                self.draw_mode = DrawMode::SINK;
+                            if self.draw_mode == DrawMode::Gas {
+                                self.draw_mode = DrawMode::Source;
+                            } else if self.draw_mode == DrawMode::Source {
+                                self.draw_mode = DrawMode::Sink;
+                            } else if self.draw_mode == DrawMode::Sink {
+                                self.draw_mode = DrawMode::Gas;
                             }
                         }
                         Key::Named(NamedKey::ArrowUp) => {
@@ -158,22 +168,26 @@ impl ApplicationHandler for App {
                     }
                 }
             }
-            WindowEvent::CursorMoved { position, .. } => self.mouse_position = position,
-            WindowEvent::MouseInput { state, button, .. } => {
-                if state.is_pressed() {
-                    println!(
-                        "position: {:?}\nbutton: {:?}\nsize: {:?}\nmode: {:?}",
-                        self.mouse_position, button, self.draw_size, self.draw_mode
+            WindowEvent::CursorMoved { position, .. } => {
+                self.mouse_position = position;
+                if self.mouse_down {
+                    self.apply_brush(
+                        self.mouse_position.x as usize / self.grid.cell_size,
+                        self.mouse_position.y as usize / self.grid.cell_size,
+                        self.draw_size,
+                        self.draw_size,
                     );
-                    match button {
-                        MouseButton::Left => self.apply_brush(
-                            self.mouse_position.x as usize,
-                            self.mouse_position.y as usize,
-                            self.draw_size,
-                            self.draw_size,
-                        ),
-                        _ => {}
-                    }
+                }
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                if button == MouseButton::Left {
+                    self.mouse_down = state.is_pressed();
+                    self.apply_brush(
+                        self.mouse_position.x as usize / self.grid.cell_size,
+                        self.mouse_position.y as usize / self.grid.cell_size,
+                        self.draw_size,
+                        self.draw_size,
+                    );
                 }
             }
             _ => {}
