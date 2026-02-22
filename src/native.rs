@@ -4,6 +4,7 @@ use pixels::{Pixels, SurfaceTexture};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
+    event_loop::EventLoop,
     window::{Window, WindowAttributes},
 };
 
@@ -60,6 +61,7 @@ fn apply_brush(
 struct App {
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
+    grid: Grid,
 }
 
 impl App {
@@ -67,6 +69,7 @@ impl App {
         Self {
             window: None,
             pixels: None,
+            grid: Grid::new(WIDTH, HEIGHT, 10),
         }
     }
 }
@@ -93,102 +96,43 @@ impl ApplicationHandler for App {
     fn window_event(
         &mut self,
         event_loop: &winit::event_loop::ActiveEventLoop,
-        window_id: winit::window::WindowId,
+        _window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Resized(size) => {
+                if let Some(pixels) = &mut self.pixels {
+                    pixels.resize_surface(size.width, size.height);
+                    pixels.resize_buffer(size.width, size.height);
+                }
+            }
+            WindowEvent::RedrawRequested => {
+                let bg_colour: Colour = Colour::new(0, 0, 0, 255);
+
+                if let Some(pixels) = &mut self.pixels {
+                    let frame = pixels.frame_mut();
+                    for pixel in frame.chunks_exact_mut(4) {
+                        pixel[0] = bg_colour.red;
+                        pixel[1] = bg_colour.green;
+                        pixel[2] = bg_colour.blue;
+                        pixel[3] = bg_colour.alpha;
+                    }
+                    pixels.render().unwrap();
+                }
+
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
+            }
             _ => {}
         }
     }
 }
 
 pub fn run() {
-    let bg_colour: Colour = Colour::new(0, 0, 0);
-
-    let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
-    let mut window = Window::new(
-        "Diffusion Simulation Window",
-        WIDTH,
-        HEIGHT,
-        WindowOptions {
-            borderless: true,
-            topmost: true,
-            ..WindowOptions::default()
-        },
-    )
-    .unwrap_or_else(|e| panic!("{}", e));
-    window.set_target_fps(120);
-
-    let mut grid = Grid::new(WIDTH, HEIGHT, 10);
-
-    let mut mouse_intensity = 1.0;
-    let mut mouse_size: usize = 1;
-    let mut mouse_mode = DrawMode::GAS;
-
-    let delta = 1.0;
-
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        window
-            .get_keys_pressed(minifb::KeyRepeat::No)
-            .iter()
-            .for_each(|key| match key {
-                Key::Space => {
-                    mouse_mode = match mouse_mode {
-                        DrawMode::GAS => DrawMode::SOURCE,
-                        DrawMode::SOURCE => DrawMode::SINK,
-                        DrawMode::SINK => DrawMode::GAS,
-                    }
-                }
-                Key::Up => {
-                    mouse_intensity += 0.25;
-                    if mouse_intensity >= 1.0 {
-                        mouse_intensity = 1.0;
-                    }
-                }
-                Key::Down => {
-                    mouse_intensity -= 0.25;
-                    if mouse_intensity <= 0.0 {
-                        mouse_intensity = 0.0;
-                    }
-                }
-                Key::C => {
-                    grid.sources.clear();
-                    grid.concentrations.fill(0.0);
-                }
-                _ => (),
-            });
-
-        if let Some(mouse_scroll) = window.get_scroll_wheel() {
-            if mouse_scroll.1 < 0.0 {
-                mouse_size += 1
-            } else if mouse_scroll.1 > 0.0 && mouse_size > 0 {
-                mouse_size -= 1
-            }
-        }
-
-        if window.get_mouse_down(minifb::MouseButton::Left)
-            && let Some(mouse_pos) = window.get_mouse_pos(minifb::MouseMode::Discard)
-        {
-            apply_brush(
-                mouse_pos.0 as usize / grid.cell_size,
-                mouse_pos.1 as usize / grid.cell_size,
-                mouse_size,
-                mouse_size,
-                mouse_intensity,
-                &mut grid,
-                &mouse_mode,
-            );
-        }
-
-        grid.update(DIFFUSION, delta);
-
-        for i in buffer.iter_mut() {
-            *i = bg_colour.to_u32();
-        }
-
-        grid.draw(&mut buffer);
-
-        window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
-    }
+    let event_loop = EventLoop::new().unwrap();
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    let mut app = App::new();
+    event_loop.run_app(&mut app).unwrap();
 }
