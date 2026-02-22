@@ -42,10 +42,9 @@ fn main() {
     .unwrap_or_else(|e| panic!("{}", e));
     window.set_target_fps(120);
 
-    let mut grid = grid::Grid::new(WIDTH, HEIGHT, 1);
-    create_cell_square(620, 400, 10, 0.75, &mut grid);
-    create_cell_square(100, 90, 5, 0.5, &mut grid);
-    create_cell_square(500, 400, 20, 1.0, &mut grid);
+    let mut grid = grid::Grid::new(WIDTH, HEIGHT, 10);
+    create_cell_square(10, 9, 5, 0.5, &mut grid);
+    create_cell_square(50, 40, 20, 0.5, &mut grid);
 
     let delta = 2.5;
 
@@ -56,11 +55,13 @@ fn main() {
             create_cell_square(
                 mouse_pos.0 as usize / grid.cell_size,
                 mouse_pos.1 as usize / grid.cell_size,
-                10,
+                5,
                 1.0,
                 &mut grid,
             );
         }
+
+        grid.update(DIFFUSION, delta);
 
         for i in buffer.iter_mut() {
             *i = bg_colour.to_u32();
