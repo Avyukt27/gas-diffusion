@@ -46,7 +46,12 @@ impl Grid {
         }
     }
 
-    pub fn update(&mut self, diffusion_coefficient: f64, delta: f64) {
+    pub fn update(
+        &mut self,
+        diffusion_coefficient: f64,
+        advection_constants: (f64, f64),
+        delta: f64,
+    ) {
         let mut next = self.concentrations.clone();
 
         for y in 0..self.grid_height {
@@ -55,13 +60,38 @@ impl Grid {
 
                 let concentration = self.concentrations[idx];
                 let source_rate = self.sources[idx];
-                let neighbor_sum: f64 = self
-                    .get_neighbors(idx)
-                    .into_iter()
-                    .map(|v| v.unwrap_or(0.0))
-                    .sum();
+                let neighbors: [Option<f64>; 4] = self.get_neighbors(idx);
+                let neighbor_sum: f64 = neighbors.into_iter().map(|v| v.unwrap_or(0.0)).sum();
+
+                let concentration_change_x = if advection_constants.0 > 0.0
+                    && let Some(concentration_left) = neighbors[0]
+                {
+                    (concentration - concentration_left) / self.cell_size as f64
+                } else if advection_constants.0 < 0.0
+                    && let Some(concentration_right) = neighbors[1]
+                {
+                    (concentration_right - concentration) / self.cell_size as f64
+                } else {
+                    0.0
+                };
+                let concentration_change_y = if advection_constants.1 > 0.0
+                    && let Some(concentration_up) = neighbors[2]
+                {
+                    (concentration - concentration_up) / self.cell_size as f64
+                } else if advection_constants.1 < 0.0
+                    && let Some(concentration_down) = neighbors[3]
+                {
+                    (concentration_down - concentration) / self.cell_size as f64
+                } else {
+                    0.0
+                };
+
+                let advection = -delta
+                    * (advection_constants.0 * concentration_change_x
+                        + advection_constants.1 * concentration_change_y);
 
                 next[idx] = (concentration
+                    + advection
                     + diffusion_coefficient * delta * (neighbor_sum - 4.0 * concentration)
                         / (self.cell_size * self.cell_size) as f64
                     + source_rate)

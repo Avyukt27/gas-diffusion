@@ -14,6 +14,7 @@ use crate::{colour::Colour, grid::Grid};
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
 const DIFFUSION: f64 = 2.0;
+const ADVECTION: (f64, f64) = (1.0, 0.0);
 const DELTA: f64 = 1.0;
 
 #[derive(PartialEq, Eq, Debug)]
@@ -113,7 +114,7 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 let bg_colour: Colour = Colour::new(0, 0, 0, 255);
 
-                self.grid.update(DIFFUSION, DELTA);
+                self.grid.update(DIFFUSION, ADVECTION, DELTA);
 
                 if let Some(pixels) = &mut self.pixels {
                     let frame = pixels.frame_mut();
