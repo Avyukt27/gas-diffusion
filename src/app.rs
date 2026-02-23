@@ -87,7 +87,7 @@ impl App {
                         let dy = start_y as f64 - prev_cell_y as f64;
                         let strength = 5.0;
                         let vel = (dx * strength, dy * strength);
-                        let max_vel = self.grid.cell_size as f64 / DELTA;
+                        let max_vel = self.grid.cell_size as f64 / DELTA * 0.5;
 
                         self.grid.advection[idx].0 =
                             (self.grid.advection[idx].0 + vel.0).clamp(-max_vel, max_vel);
