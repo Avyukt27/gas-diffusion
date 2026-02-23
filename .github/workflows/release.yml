@@ -1,12 +1,5 @@
-name: Build and Release
-
-on:
-  push:
-    tags:
-      - 'v*.*.*'
-
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -14,6 +7,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -36,20 +31,9 @@ jobs:
             cp target/${{ matrix.target }}/release/diffusion release/diffusion-linux
             zip -j release/diffusion-linux.zip release/diffusion-linux
           fi
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Create release with all artifacts
+        uses: softprops/action-gh-release@v1
         with:
-          name: ${{ matrix.target }}
-          path: release/*.zip
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Download artifacts
-        uses: actions/download-artifact@v7
-        with:
-          path: release
+          files: release/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
