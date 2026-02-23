@@ -1,7 +1,7 @@
 use crate::colour::Colour;
 
 pub struct Grid {
-    pub screen_width: usize,
+    screen_width: usize,
     pub grid_width: usize,
     pub grid_height: usize,
     pub cell_size: usize,
