@@ -156,7 +156,7 @@ impl ApplicationHandler for App {
                         }
                         Key::Character(ref c) if c == "c" => {
                             self.grid.concentrations.fill(0.0);
-                            self.grid.sources.clear();
+                            self.grid.sources.fill(0.0);
                         }
                         _ => {}
                     }
