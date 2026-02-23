@@ -361,10 +361,7 @@ dependencies = [
 name = "diffusion"
 version = "0.1.0"
 dependencies = [
- "js-sys",
  "pixels",
- "wasm-bindgen",
- "web-sys",
  "winit",
 ]
 

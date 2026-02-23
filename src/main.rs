@@ -1,9 +1,8 @@
-#[cfg(not(target_arch = "wasm32"))]
-fn main() {
-    diffusion::native::run();
-}
+pub mod colour;
+pub mod grid;
+pub mod native;
+pub mod source;
 
-#[cfg(target_arch = "wasm32")]
 fn main() {
-    diffusion::wasm::run();
+    native::run();
 }
