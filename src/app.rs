@@ -83,9 +83,9 @@ impl App {
                         self.grid.sources[idx] += rate;
                     }
                     DrawMode::Advection => {
-                        let dx = start_x.saturating_sub_signed(prev_cell_x as isize) as f64;
-                        let dy = start_y.saturating_sub_signed(prev_cell_y as isize) as f64;
-                        let strength = 2.0;
+                        let dx = start_x as f64 - prev_cell_x as f64;
+                        let dy = start_y as f64 - prev_cell_y as f64;
+                        let strength = 5.0;
                         let vel = (dx * strength, dy * strength);
                         let max_vel = self.grid.cell_size as f64 / DELTA;
 
