@@ -159,6 +159,7 @@ impl ApplicationHandler for App {
                         Key::Character(ref c) if c == "c" => {
                             self.grid.concentrations.fill(0.0);
                             self.grid.sources.fill(0.0);
+                            self.advection = (0.0, 0.0);
                         }
                         Key::Character(ref c) if c == "a" => self.advection.0 -= 0.5,
                         Key::Character(ref c) if c == "d" => self.advection.0 += 0.5,
