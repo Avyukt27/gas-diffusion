@@ -1,0 +1,213 @@
+use std::sync::Arc;
+
+use pixels::{Pixels, SurfaceTexture};
+use winit::{
+    application::ApplicationHandler,
+    dpi::PhysicalPosition,
+    event::{KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
+    event_loop::EventLoop,
+    keyboard::{Key, NamedKey},
+    window::{Window, WindowAttributes},
+};
+
+use crate::{colour::Colour, grid::Grid, source::Source};
+
+const WIDTH: usize = 800;
+const HEIGHT: usize = 600;
+const DIFFUSION: f64 = 2.0;
+const DELTA: f64 = 1.0;
+
+#[derive(PartialEq, Eq, Debug)]
+enum DrawMode {
+    Gas,
+    Source,
+    Sink,
+}
+
+struct App {
+    window: Option<Arc<Window>>,
+    pixels: Option<Pixels<'static>>,
+    grid: Grid,
+    draw_mode: DrawMode,
+    draw_size: usize,
+    draw_intensity: f64,
+    mouse_down: bool,
+    mouse_position: PhysicalPosition<f64>,
+}
+
+impl App {
+    pub fn new() -> Self {
+        Self {
+            window: None,
+            pixels: None,
+            grid: Grid::new(WIDTH, HEIGHT, 10),
+            draw_mode: DrawMode::Gas,
+            draw_size: 1,
+            draw_intensity: 1.0,
+            mouse_down: false,
+            mouse_position: PhysicalPosition::new(0.0, 0.0),
+        }
+    }
+
+    fn apply_brush(&mut self, start_x: usize, start_y: usize, width: usize, height: usize) {
+        if start_x >= self.grid.grid_width || start_y >= self.grid.grid_height {
+            return;
+        }
+
+        let max_x = (start_x + width).min(self.grid.grid_width);
+        let max_y = (start_y + height).min(self.grid.grid_height);
+
+        for y in start_y..max_y {
+            for x in start_x..max_x {
+                let idx = y * self.grid.grid_width + x;
+                match self.draw_mode {
+                    DrawMode::Gas => {
+                        self.grid.concentrations[idx] = self.draw_intensity.clamp(0.0, 1.0);
+                    }
+                    DrawMode::Source | DrawMode::Sink => {
+                        let rate = if matches!(self.draw_mode, DrawMode::Source) {
+                            self.draw_intensity.abs() / 100.0
+                        } else {
+                            -self.draw_intensity.abs() / 100.0
+                        };
+
+                        if let Some(existing) =
+                            self.grid.sources.iter_mut().find(|s| s.x == x && s.y == y)
+                        {
+                            existing.rate = rate;
+                        } else {
+                            self.grid.sources.push(Source { x, y, rate });
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let window = event_loop
+            .create_window(
+                WindowAttributes::default()
+                    .with_title("Diffusion Simulation Window")
+                    .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64)),
+            )
+            .unwrap();
+
+        let window = Arc::new(window);
+
+        let surface = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, window.clone());
+        let pixels = Pixels::new(WIDTH as u32, HEIGHT as u32, surface).unwrap();
+
+        self.window = Some(window.clone());
+        self.pixels = Some(pixels);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: winit::event::WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Resized(size) => {
+                if let Some(pixels) = &mut self.pixels {
+                    pixels.resize_surface(size.width, size.height).unwrap();
+                    pixels.resize_buffer(size.width, size.height).unwrap();
+                }
+            }
+            WindowEvent::RedrawRequested => {
+                let bg_colour: Colour = Colour::new(0, 0, 0, 255);
+
+                self.grid.update(DIFFUSION, DELTA);
+
+                if let Some(pixels) = &mut self.pixels {
+                    let frame = pixels.frame_mut();
+                    for pixel in frame.chunks_exact_mut(4) {
+                        pixel[0] = bg_colour.red;
+                        pixel[1] = bg_colour.green;
+                        pixel[2] = bg_colour.blue;
+                        pixel[3] = bg_colour.alpha;
+                    }
+                    self.grid.draw(frame);
+                    pixels.render().unwrap();
+                }
+
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
+            }
+            WindowEvent::KeyboardInput {
+                event: KeyEvent {
+                    logical_key, state, ..
+                },
+                ..
+            } => {
+                if state.is_pressed() {
+                    match logical_key {
+                        Key::Named(NamedKey::Space) => {
+                            if self.draw_mode == DrawMode::Gas {
+                                self.draw_mode = DrawMode::Source;
+                            } else if self.draw_mode == DrawMode::Source {
+                                self.draw_mode = DrawMode::Sink;
+                            } else if self.draw_mode == DrawMode::Sink {
+                                self.draw_mode = DrawMode::Gas;
+                            }
+                        }
+                        Key::Named(NamedKey::ArrowUp) => {
+                            self.draw_intensity = (self.draw_intensity + 0.25).clamp(0.0, 1.0)
+                        }
+                        Key::Named(NamedKey::ArrowDown) => {
+                            self.draw_intensity = (self.draw_intensity - 0.25).clamp(0.0, 1.0)
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.mouse_position = position;
+                if self.mouse_down {
+                    self.apply_brush(
+                        self.mouse_position.x as usize / self.grid.cell_size,
+                        self.mouse_position.y as usize / self.grid.cell_size,
+                        self.draw_size,
+                        self.draw_size,
+                    );
+                }
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                if button == MouseButton::Left {
+                    self.mouse_down = state.is_pressed();
+                    self.apply_brush(
+                        self.mouse_position.x as usize / self.grid.cell_size,
+                        self.mouse_position.y as usize / self.grid.cell_size,
+                        self.draw_size,
+                        self.draw_size,
+                    );
+                }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let scroll_y = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => y as f64,
+                    MouseScrollDelta::PixelDelta(pos) => pos.y / 50.0,
+                };
+
+                if scroll_y > 0.0 {
+                    self.draw_size += 1;
+                } else if scroll_y < 0.0 && self.draw_size > 1 {
+                    self.draw_size -= 1;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+pub fn run() {
+    let event_loop = EventLoop::new().unwrap();
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    let mut app = App::new();
+    event_loop.run_app(&mut app).unwrap();
+}

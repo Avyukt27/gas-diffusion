@@ -24,7 +24,7 @@ impl Grid {
         }
     }
 
-    pub fn draw(&self, buffer: &mut Vec<u32>) {
+    pub fn draw(&self, buffer: &mut [u8]) {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
                 let colour = self.generate_heatmap(y * self.grid_width + x);
@@ -33,7 +33,13 @@ impl Grid {
                     for dx in 0..self.cell_size {
                         let pixel_x = x * self.cell_size + dx;
                         let pixel_y = y * self.cell_size + dy;
-                        buffer[pixel_y * self.screen_width + pixel_x] = colour;
+
+                        let idx = (pixel_y * self.screen_width + pixel_x) * 4;
+
+                        buffer[idx] = colour.red;
+                        buffer[idx + 1] = colour.green;
+                        buffer[idx + 2] = colour.blue;
+                        buffer[idx + 3] = colour.alpha;
                     }
                 }
             }
@@ -100,15 +106,15 @@ impl Grid {
         [left, right, up, down]
     }
 
-    fn generate_heatmap(&self, idx: usize) -> u32 {
+    fn generate_heatmap(&self, idx: usize) -> Colour {
         let concentration = self.concentrations[idx].clamp(0.0, 1.0);
 
         let stops = [
-            (0.01, Colour::new(0, 0, 75)),
-            (0.25, Colour::new(0, 204, 255)),
-            (0.5, Colour::new(0, 255, 0)),
-            (0.75, Colour::new(255, 255, 0)),
-            (1.0, Colour::new(255, 0, 0)),
+            (0.01, Colour::new(0, 0, 75, 255)),
+            (0.25, Colour::new(0, 204, 255, 255)),
+            (0.5, Colour::new(0, 255, 0, 255)),
+            (0.75, Colour::new(255, 255, 0, 255)),
+            (1.0, Colour::new(255, 0, 0, 255)),
         ];
 
         for i in 0..(stops.len() - 1) {
@@ -122,11 +128,11 @@ impl Grid {
                 let g = self.lerp(colour0.green as f64, colour1.green as f64, a);
                 let b = self.lerp(colour0.blue as f64, colour1.blue as f64, a);
 
-                return Colour::new(r as u8, g as u8, b as u8).to_u32();
+                return Colour::new(r as u8, g as u8, b as u8, 255);
             }
         }
 
-        Colour::new(0, 0, 0).to_u32()
+        Colour::new(0, 0, 0, 0)
     }
 
     fn lerp(&self, a: f64, b: f64, t: f64) -> f64 {

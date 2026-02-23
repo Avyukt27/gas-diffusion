@@ -4,4 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-minifb = "0.28.0"
+pixels = "0.15.0"
+wasm-bindgen = "0.2.111"
+winit = "0.30.12"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3", features = [
+	"Window",
+	"Document",
+	"HtmlCanvasElement",
+	"CanvasRenderingContext2d"
+]}
+js-sys = "0.3"
