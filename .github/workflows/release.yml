@@ -22,8 +22,11 @@ jobs:
       - name: Install mingw
         if: matrix.target == 'x86_64-pc-windows-gnu'
         run: sudo apt install -y mingw-w64
-      - name Add target
-        run: rustup target add ${{ matrix.target }}
+      - name: Add Rust target
+        run: |
+          rustup target add $TARGET
+        env:
+          TARGET: ${{ matrix.target }}
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
       - name: Upload artifact
