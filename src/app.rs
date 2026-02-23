@@ -27,7 +27,6 @@ pub struct App {
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
     grid: Grid,
-    advection: (f64, f64),
     draw_mode: DrawMode,
     draw_size: usize,
     draw_intensity: f64,
@@ -41,7 +40,6 @@ impl App {
             window: None,
             pixels: None,
             grid: Grid::new(WIDTH, HEIGHT, 10),
-            advection: (0.0, 0.0),
             draw_mode: DrawMode::Gas,
             draw_size: 1,
             draw_intensity: 1.0,
@@ -115,7 +113,7 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 let bg_colour: Colour = Colour::new(0, 0, 0, 255);
 
-                self.grid.update(DIFFUSION, self.advection, DELTA);
+                self.grid.update(DIFFUSION, DELTA);
 
                 if let Some(pixels) = &mut self.pixels {
                     let frame = pixels.frame_mut();
@@ -159,47 +157,7 @@ impl ApplicationHandler for App {
                         Key::Character(ref c) if c == "c" => {
                             self.grid.concentrations.fill(0.0);
                             self.grid.sources.fill(0.0);
-                            self.advection = (0.0, 0.0);
-                        }
-                        Key::Character(ref c) if c == "a" => {
-                            let new_u = self.advection.0 - 0.5;
-                            let new_v = self.advection.1;
-                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
-                                / self.grid.cell_size as f64
-                                <= 1.0
-                            {
-                                self.advection.0 = new_u;
-                            }
-                        }
-                        Key::Character(ref c) if c == "d" => {
-                            let new_u = self.advection.0 + 0.5;
-                            let new_v = self.advection.1;
-                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
-                                / self.grid.cell_size as f64
-                                <= 1.0
-                            {
-                                self.advection.0 = new_u;
-                            }
-                        }
-                        Key::Character(ref c) if c == "w" => {
-                            let new_u = self.advection.0;
-                            let new_v = self.advection.1 - 0.5;
-                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
-                                / self.grid.cell_size as f64
-                                <= 1.0
-                            {
-                                self.advection.1 = new_v;
-                            }
-                        }
-                        Key::Character(ref c) if c == "s" => {
-                            let new_u = self.advection.0;
-                            let new_v = self.advection.1 + 0.5;
-                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
-                                / self.grid.cell_size as f64
-                                <= 1.0
-                            {
-                                self.advection.1 = new_v;
-                            }
+                            self.grid.advection.fill((0.0, 0.0));
                         }
                         _ => {}
                     }
