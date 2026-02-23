@@ -21,6 +21,7 @@ enum DrawMode {
     Gas,
     Source,
     Sink,
+    Advection,
 }
 
 pub struct App {
@@ -31,6 +32,7 @@ pub struct App {
     draw_size: usize,
     draw_intensity: f64,
     mouse_down: bool,
+    prev_mouse_position: PhysicalPosition<f64>,
     mouse_position: PhysicalPosition<f64>,
 }
 
@@ -44,11 +46,20 @@ impl App {
             draw_size: 1,
             draw_intensity: 1.0,
             mouse_down: false,
+            prev_mouse_position: PhysicalPosition::new(0.0, 0.0),
             mouse_position: PhysicalPosition::new(0.0, 0.0),
         }
     }
 
-    fn apply_brush(&mut self, start_x: usize, start_y: usize, width: usize, height: usize) {
+    fn apply_brush(
+        &mut self,
+        start_x: usize,
+        start_y: usize,
+        prev_cell_x: usize,
+        prev_cell_y: usize,
+        width: usize,
+        height: usize,
+    ) {
         if start_x >= self.grid.grid_width || start_y >= self.grid.grid_height {
             return;
         }
@@ -70,6 +81,18 @@ impl App {
                             -self.draw_intensity.abs() / 100.0
                         };
                         self.grid.sources[idx] += rate;
+                    }
+                    DrawMode::Advection => {
+                        let dx = start_x.saturating_sub_signed(prev_cell_x as isize) as f64;
+                        let dy = start_y.saturating_sub_signed(prev_cell_y as isize) as f64;
+                        let strength = 2.0;
+                        let vel = (dx * strength, dy * strength);
+                        let max_vel = self.grid.cell_size as f64 / DELTA;
+
+                        self.grid.advection[idx].0 =
+                            (self.grid.advection[idx].0 + vel.0).clamp(-max_vel, max_vel);
+                        self.grid.advection[idx].1 =
+                            (self.grid.advection[idx].1 + vel.1).clamp(-max_vel, max_vel);
                     }
                 }
             }
@@ -139,15 +162,12 @@ impl ApplicationHandler for App {
             } => {
                 if state.is_pressed() {
                     match logical_key {
-                        Key::Named(NamedKey::Space) => {
-                            if self.draw_mode == DrawMode::Gas {
-                                self.draw_mode = DrawMode::Source;
-                            } else if self.draw_mode == DrawMode::Source {
-                                self.draw_mode = DrawMode::Sink;
-                            } else if self.draw_mode == DrawMode::Sink {
-                                self.draw_mode = DrawMode::Gas;
-                            }
-                        }
+                        Key::Named(NamedKey::Space) => match self.draw_mode {
+                            DrawMode::Gas => self.draw_mode = DrawMode::Source,
+                            DrawMode::Source => self.draw_mode = DrawMode::Sink,
+                            DrawMode::Sink => self.draw_mode = DrawMode::Advection,
+                            DrawMode::Advection => self.draw_mode = DrawMode::Gas,
+                        },
                         Key::Named(NamedKey::ArrowUp) => {
                             self.draw_intensity = (self.draw_intensity + 0.25).clamp(0.0, 1.0)
                         }
@@ -169,10 +189,13 @@ impl ApplicationHandler for App {
                     self.apply_brush(
                         self.mouse_position.x as usize / self.grid.cell_size,
                         self.mouse_position.y as usize / self.grid.cell_size,
+                        self.prev_mouse_position.x as usize / self.grid.cell_size,
+                        self.prev_mouse_position.y as usize / self.grid.cell_size,
                         self.draw_size,
                         self.draw_size,
                     );
                 }
+                self.prev_mouse_position = position;
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == MouseButton::Left {
@@ -180,6 +203,8 @@ impl ApplicationHandler for App {
                     self.apply_brush(
                         self.mouse_position.x as usize / self.grid.cell_size,
                         self.mouse_position.y as usize / self.grid.cell_size,
+                        self.prev_mouse_position.x as usize / self.grid.cell_size,
+                        self.prev_mouse_position.y as usize / self.grid.cell_size,
                         self.draw_size,
                         self.draw_size,
                     );
