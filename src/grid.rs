@@ -62,7 +62,10 @@ impl Grid {
                 let advection = advections[idx];
 
                 let neighbors = self.get_neighbors(idx, &advections);
-                let neighbor_sum: f64 = neighbors.into_iter().map(|v| v.unwrap_or(0.0)).sum();
+                let neighbor_sum: f64 = neighbors
+                    .into_iter()
+                    .map(|v| v.unwrap_or(self.concentrations[idx]))
+                    .sum();
 
                 next[idx] = (advection
                     + diffusion_coefficient * delta * (neighbor_sum - 4.0 * advection)
