@@ -161,10 +161,26 @@ impl ApplicationHandler for App {
                             self.grid.sources.fill(0.0);
                             self.advection = (0.0, 0.0);
                         }
-                        Key::Character(ref c) if c == "a" => self.advection.0 -= 0.5,
-                        Key::Character(ref c) if c == "d" => self.advection.0 += 0.5,
-                        Key::Character(ref c) if c == "w" => self.advection.1 -= 0.5,
-                        Key::Character(ref c) if c == "s" => self.advection.1 += 0.5,
+                        Key::Character(ref c) if c == "a" => {
+                            if self.advection.0.abs() * DELTA / self.grid.cell_size as f64 <= 1.0 {
+                                self.advection.0 -= 0.5;
+                            }
+                        }
+                        Key::Character(ref c) if c == "d" => {
+                            if self.advection.0.abs() * DELTA / self.grid.cell_size as f64 <= 1.0 {
+                                self.advection.0 += 0.5;
+                            }
+                        }
+                        Key::Character(ref c) if c == "w" => {
+                            if self.advection.1.abs() * DELTA / self.grid.cell_size as f64 <= 1.0 {
+                                self.advection.1 -= 0.5;
+                            }
+                        }
+                        Key::Character(ref c) if c == "s" => {
+                            if self.advection.1.abs() * DELTA / self.grid.cell_size as f64 <= 1.0 {
+                                self.advection.1 += 0.5;
+                            }
+                        }
                         _ => {}
                     }
                 }
