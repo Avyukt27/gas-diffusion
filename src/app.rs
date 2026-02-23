@@ -162,23 +162,43 @@ impl ApplicationHandler for App {
                             self.advection = (0.0, 0.0);
                         }
                         Key::Character(ref c) if c == "a" => {
-                            if self.advection.0.abs() * DELTA / self.grid.cell_size as f64 <= 1.0 {
-                                self.advection.0 -= 0.5;
+                            let new_u = self.advection.0 - 0.5;
+                            let new_v = self.advection.1;
+                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
+                                / self.grid.cell_size as f64
+                                <= 1.0
+                            {
+                                self.advection.0 = new_u;
                             }
                         }
                         Key::Character(ref c) if c == "d" => {
-                            if self.advection.0.abs() * DELTA / self.grid.cell_size as f64 <= 1.0 {
-                                self.advection.0 += 0.5;
+                            let new_u = self.advection.0 + 0.5;
+                            let new_v = self.advection.1;
+                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
+                                / self.grid.cell_size as f64
+                                <= 1.0
+                            {
+                                self.advection.0 = new_u;
                             }
                         }
                         Key::Character(ref c) if c == "w" => {
-                            if self.advection.1.abs() * DELTA / self.grid.cell_size as f64 <= 1.0 {
-                                self.advection.1 -= 0.5;
+                            let new_u = self.advection.0;
+                            let new_v = self.advection.1 - 0.5;
+                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
+                                / self.grid.cell_size as f64
+                                <= 1.0
+                            {
+                                self.advection.1 = new_v;
                             }
                         }
                         Key::Character(ref c) if c == "s" => {
-                            if self.advection.1.abs() * DELTA / self.grid.cell_size as f64 <= 1.0 {
-                                self.advection.1 += 0.5;
+                            let new_u = self.advection.0;
+                            let new_v = self.advection.1 + 0.5;
+                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
+                                / self.grid.cell_size as f64
+                                <= 1.0
+                            {
+                                self.advection.1 = new_v;
                             }
                         }
                         _ => {}

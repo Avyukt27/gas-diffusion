@@ -153,7 +153,7 @@ impl Grid {
                 );
 
                 let backward_advection = forward_advection
-                    - delta
+                    + delta
                         * (advection_constants.0 * value_change.0
                             + advection_constants.1 * value_change.1);
 
