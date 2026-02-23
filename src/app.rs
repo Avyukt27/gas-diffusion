@@ -21,17 +21,18 @@ enum DrawMode {
     Gas,
     Source,
     Sink,
+    Advection,
 }
 
 pub struct App {
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
     grid: Grid,
-    advection: (f64, f64),
     draw_mode: DrawMode,
     draw_size: usize,
     draw_intensity: f64,
     mouse_down: bool,
+    prev_mouse_position: PhysicalPosition<f64>,
     mouse_position: PhysicalPosition<f64>,
 }
 
@@ -41,16 +42,24 @@ impl App {
             window: None,
             pixels: None,
             grid: Grid::new(WIDTH, HEIGHT, 10),
-            advection: (0.0, 0.0),
             draw_mode: DrawMode::Gas,
             draw_size: 1,
             draw_intensity: 1.0,
             mouse_down: false,
+            prev_mouse_position: PhysicalPosition::new(0.0, 0.0),
             mouse_position: PhysicalPosition::new(0.0, 0.0),
         }
     }
 
-    fn apply_brush(&mut self, start_x: usize, start_y: usize, width: usize, height: usize) {
+    fn apply_brush(
+        &mut self,
+        start_x: usize,
+        start_y: usize,
+        prev_cell_x: usize,
+        prev_cell_y: usize,
+        width: usize,
+        height: usize,
+    ) {
         if start_x >= self.grid.grid_width || start_y >= self.grid.grid_height {
             return;
         }
@@ -72,6 +81,18 @@ impl App {
                             -self.draw_intensity.abs() / 100.0
                         };
                         self.grid.sources[idx] += rate;
+                    }
+                    DrawMode::Advection => {
+                        let dx = start_x as f64 - prev_cell_x as f64;
+                        let dy = start_y as f64 - prev_cell_y as f64;
+                        let strength = 5.0;
+                        let vel = (dx * strength, dy * strength);
+                        let max_vel = self.grid.cell_size as f64 / DELTA * 0.5;
+
+                        self.grid.advection[idx].0 =
+                            (self.grid.advection[idx].0 + vel.0).clamp(-max_vel, max_vel);
+                        self.grid.advection[idx].1 =
+                            (self.grid.advection[idx].1 + vel.1).clamp(-max_vel, max_vel);
                     }
                 }
             }
@@ -115,7 +136,7 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 let bg_colour: Colour = Colour::new(0, 0, 0, 255);
 
-                self.grid.update(DIFFUSION, self.advection, DELTA);
+                self.grid.update(DIFFUSION, DELTA);
 
                 if let Some(pixels) = &mut self.pixels {
                     let frame = pixels.frame_mut();
@@ -141,15 +162,12 @@ impl ApplicationHandler for App {
             } => {
                 if state.is_pressed() {
                     match logical_key {
-                        Key::Named(NamedKey::Space) => {
-                            if self.draw_mode == DrawMode::Gas {
-                                self.draw_mode = DrawMode::Source;
-                            } else if self.draw_mode == DrawMode::Source {
-                                self.draw_mode = DrawMode::Sink;
-                            } else if self.draw_mode == DrawMode::Sink {
-                                self.draw_mode = DrawMode::Gas;
-                            }
-                        }
+                        Key::Named(NamedKey::Space) => match self.draw_mode {
+                            DrawMode::Gas => self.draw_mode = DrawMode::Source,
+                            DrawMode::Source => self.draw_mode = DrawMode::Sink,
+                            DrawMode::Sink => self.draw_mode = DrawMode::Advection,
+                            DrawMode::Advection => self.draw_mode = DrawMode::Gas,
+                        },
                         Key::Named(NamedKey::ArrowUp) => {
                             self.draw_intensity = (self.draw_intensity + 0.25).clamp(0.0, 1.0)
                         }
@@ -159,47 +177,7 @@ impl ApplicationHandler for App {
                         Key::Character(ref c) if c == "c" => {
                             self.grid.concentrations.fill(0.0);
                             self.grid.sources.fill(0.0);
-                            self.advection = (0.0, 0.0);
-                        }
-                        Key::Character(ref c) if c == "a" => {
-                            let new_u = self.advection.0 - 0.5;
-                            let new_v = self.advection.1;
-                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
-                                / self.grid.cell_size as f64
-                                <= 1.0
-                            {
-                                self.advection.0 = new_u;
-                            }
-                        }
-                        Key::Character(ref c) if c == "d" => {
-                            let new_u = self.advection.0 + 0.5;
-                            let new_v = self.advection.1;
-                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
-                                / self.grid.cell_size as f64
-                                <= 1.0
-                            {
-                                self.advection.0 = new_u;
-                            }
-                        }
-                        Key::Character(ref c) if c == "w" => {
-                            let new_u = self.advection.0;
-                            let new_v = self.advection.1 - 0.5;
-                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
-                                / self.grid.cell_size as f64
-                                <= 1.0
-                            {
-                                self.advection.1 = new_v;
-                            }
-                        }
-                        Key::Character(ref c) if c == "s" => {
-                            let new_u = self.advection.0;
-                            let new_v = self.advection.1 + 0.5;
-                            if (new_u.abs() * DELTA + new_v.abs() * DELTA)
-                                / self.grid.cell_size as f64
-                                <= 1.0
-                            {
-                                self.advection.1 = new_v;
-                            }
+                            self.grid.advection.fill((0.0, 0.0));
                         }
                         _ => {}
                     }
@@ -211,10 +189,13 @@ impl ApplicationHandler for App {
                     self.apply_brush(
                         self.mouse_position.x as usize / self.grid.cell_size,
                         self.mouse_position.y as usize / self.grid.cell_size,
+                        self.prev_mouse_position.x as usize / self.grid.cell_size,
+                        self.prev_mouse_position.y as usize / self.grid.cell_size,
                         self.draw_size,
                         self.draw_size,
                     );
                 }
+                self.prev_mouse_position = position;
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == MouseButton::Left {
@@ -222,6 +203,8 @@ impl ApplicationHandler for App {
                     self.apply_brush(
                         self.mouse_position.x as usize / self.grid.cell_size,
                         self.mouse_position.y as usize / self.grid.cell_size,
+                        self.prev_mouse_position.x as usize / self.grid.cell_size,
+                        self.prev_mouse_position.y as usize / self.grid.cell_size,
                         self.draw_size,
                         self.draw_size,
                     );

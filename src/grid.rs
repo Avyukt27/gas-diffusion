@@ -7,6 +7,7 @@ pub struct Grid {
     pub cell_size: usize,
     pub concentrations: Vec<f64>,
     pub sources: Vec<f64>,
+    pub advection: Vec<(f64, f64)>,
 }
 
 impl Grid {
@@ -21,6 +22,7 @@ impl Grid {
             cell_size,
             concentrations: vec![0.0; grid_width * grid_height],
             sources: vec![0.0; grid_width * grid_height],
+            advection: vec![(0.0, 0.0); grid_width * grid_height],
         }
     }
 
@@ -46,14 +48,9 @@ impl Grid {
         }
     }
 
-    pub fn update(
-        &mut self,
-        diffusion_coefficient: f64,
-        advection_constants: (f64, f64),
-        delta: f64,
-    ) {
+    pub fn update(&mut self, diffusion_coefficient: f64, delta: f64) {
         let mut next = self.concentrations.clone();
-        let advections = self.get_advections(advection_constants, delta);
+        let advections = self.get_advections(delta);
 
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
@@ -79,24 +76,24 @@ impl Grid {
         &self,
         value: f64,
         neighbors: [Option<f64>; 4],
-        advection_constants: (f64, f64),
+        advection_values: (f64, f64),
     ) -> (f64, f64) {
-        let concentration_change_x = if advection_constants.0 > 0.0
+        let concentration_change_x = if advection_values.0 > 0.0
             && let Some(concentration_left) = neighbors[0]
         {
             (value - concentration_left) / self.cell_size as f64
-        } else if advection_constants.0 < 0.0
+        } else if advection_values.0 < 0.0
             && let Some(concentration_right) = neighbors[1]
         {
             (concentration_right - value) / self.cell_size as f64
         } else {
             0.0
         };
-        let concentration_change_y = if advection_constants.1 > 0.0
+        let concentration_change_y = if advection_values.1 > 0.0
             && let Some(concentration_up) = neighbors[2]
         {
             (value - concentration_up) / self.cell_size as f64
-        } else if advection_constants.1 < 0.0
+        } else if advection_values.1 < 0.0
             && let Some(concentration_down) = neighbors[3]
         {
             (concentration_down - value) / self.cell_size as f64
@@ -107,7 +104,7 @@ impl Grid {
         (concentration_change_x, concentration_change_y)
     }
 
-    fn get_forward_advections(&self, advection_constants: (f64, f64), delta: f64) -> Vec<f64> {
+    fn get_forward_advections(&self, delta: f64) -> Vec<f64> {
         let mut forward_advections: Vec<f64> = vec![0.0; self.grid_width * self.grid_height];
 
         for y in 0..self.grid_height {
@@ -115,15 +112,16 @@ impl Grid {
                 let idx = y * self.grid_width + x;
 
                 let concentration = self.concentrations[idx];
+                let advection_values = self.advection[idx];
                 let neighbors: [Option<f64>; 4] = self.get_neighbors(idx, &self.concentrations);
 
                 let value_change =
-                    self.get_value_change(concentration, neighbors, advection_constants);
+                    self.get_value_change(concentration, neighbors, advection_values);
 
                 let forward_advection = concentration
                     - delta
-                        * (advection_constants.0 * value_change.0
-                            + advection_constants.1 * value_change.1);
+                        * (advection_values.0 * value_change.0
+                            + advection_values.1 * value_change.1);
 
                 forward_advections[idx] = forward_advection;
             }
@@ -132,30 +130,26 @@ impl Grid {
         forward_advections
     }
 
-    fn get_backward_advections(
-        &self,
-        forward_advections: &Vec<f64>,
-        advection_constants: (f64, f64),
-        delta: f64,
-    ) -> Vec<f64> {
+    fn get_backward_advections(&self, forward_advections: &Vec<f64>, delta: f64) -> Vec<f64> {
         let mut backward_advections: Vec<f64> = vec![0.0; self.grid_width * self.grid_height];
 
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
                 let idx = y * self.grid_width + x;
+                let advection_values = self.advection[idx];
                 let forward_advection = forward_advections[idx];
                 let neighbors: [Option<f64>; 4] = self.get_neighbors(idx, &forward_advections);
 
                 let value_change = self.get_value_change(
                     forward_advection,
                     neighbors,
-                    (-advection_constants.0, -advection_constants.1),
+                    (-advection_values.0, -advection_values.1),
                 );
 
                 let backward_advection = forward_advection
-                    + delta
-                        * (advection_constants.0 * value_change.0
-                            + advection_constants.1 * value_change.1);
+                    - delta
+                        * (-advection_values.0 * value_change.0
+                            + -advection_values.1 * value_change.1);
 
                 backward_advections[idx] = backward_advection;
             }
@@ -164,10 +158,9 @@ impl Grid {
         backward_advections
     }
 
-    fn get_corrections(&self, advection_constants: (f64, f64), delta: f64) -> Vec<f64> {
-        let forward_advections = self.get_forward_advections(advection_constants, delta);
-        let backward_advections =
-            self.get_backward_advections(&forward_advections, advection_constants, delta);
+    fn get_corrections(&self, delta: f64) -> Vec<f64> {
+        let forward_advections = self.get_forward_advections(delta);
+        let backward_advections = self.get_backward_advections(&forward_advections, delta);
         let mut corrections: Vec<f64> = vec![0.0; self.grid_width * self.grid_height];
 
         for y in 0..self.grid_height {
@@ -183,8 +176,8 @@ impl Grid {
         corrections
     }
 
-    fn get_advections(&self, advection_constants: (f64, f64), delta: f64) -> Vec<f64> {
-        let corrections = self.get_corrections(advection_constants, delta);
+    fn get_advections(&self, delta: f64) -> Vec<f64> {
+        let corrections = self.get_corrections(delta);
         let mut advections: Vec<f64> = vec![0.0; self.grid_width * self.grid_height];
 
         for y in 0..self.grid_height {
