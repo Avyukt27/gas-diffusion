@@ -1,4 +1,4 @@
-use crate::{colour::Colour, source::Source};
+use crate::colour::Colour;
 
 pub struct Grid {
     pub screen_width: usize,
@@ -6,7 +6,7 @@ pub struct Grid {
     pub grid_height: usize,
     pub cell_size: usize,
     pub concentrations: Vec<f64>,
-    pub sources: Vec<Source>,
+    pub sources: Vec<f64>,
 }
 
 impl Grid {
@@ -20,7 +20,7 @@ impl Grid {
             grid_height,
             cell_size,
             concentrations: vec![0.0; grid_width * grid_height],
-            sources: vec![],
+            sources: vec![0.0; grid_width * grid_height],
         }
     }
 
@@ -54,24 +54,17 @@ impl Grid {
                 let idx = y * self.grid_width + x;
 
                 let concentration = self.concentrations[idx];
+                let source_rate = self.sources[idx];
                 let neighbor_sum: f64 = self
                     .get_neighbors(idx)
                     .into_iter()
                     .map(|v| v.unwrap_or(0.0))
                     .sum();
 
-                let mut source_contribution = 0.0;
-
-                for source in &self.sources {
-                    if source.x == x && source.y == y {
-                        source_contribution += source.rate * delta;
-                    }
-                }
-
                 next[idx] = (concentration
                     + diffusion_coefficient * delta * (neighbor_sum - 4.0 * concentration)
                         / (self.cell_size * self.cell_size) as f64
-                    + source_contribution)
+                    + source_rate)
                     .max(0.0);
             }
         }

@@ -5,12 +5,11 @@ use winit::{
     application::ApplicationHandler,
     dpi::PhysicalPosition,
     event::{KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
-    event_loop::EventLoop,
     keyboard::{Key, NamedKey},
     window::{Window, WindowAttributes},
 };
 
-use crate::{colour::Colour, grid::Grid, source::Source};
+use crate::{colour::Colour, grid::Grid};
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
@@ -24,7 +23,7 @@ enum DrawMode {
     Sink,
 }
 
-struct App {
+pub struct App {
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
     grid: Grid,
@@ -70,14 +69,7 @@ impl App {
                         } else {
                             -self.draw_intensity.abs() / 100.0
                         };
-
-                        if let Some(existing) =
-                            self.grid.sources.iter_mut().find(|s| s.x == x && s.y == y)
-                        {
-                            existing.rate = rate;
-                        } else {
-                            self.grid.sources.push(Source { x, y, rate });
-                        }
+                        self.grid.sources[idx] += rate;
                     }
                 }
             }
@@ -207,11 +199,4 @@ impl ApplicationHandler for App {
             _ => {}
         }
     }
-}
-
-pub fn run() {
-    let event_loop = EventLoop::new().unwrap();
-    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-    let mut app = App::new();
-    event_loop.run_app(&mut app).unwrap();
 }

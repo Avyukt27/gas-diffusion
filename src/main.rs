@@ -1,8 +1,12 @@
-pub mod colour;
-pub mod grid;
-pub mod native;
-pub mod source;
+use winit::event_loop::EventLoop;
+
+mod app;
+mod colour;
+mod grid;
 
 fn main() {
-    native::run();
+    let event_loop = EventLoop::new().unwrap();
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    let mut app = app::App::new();
+    event_loop.run_app(&mut app).unwrap();
 }
