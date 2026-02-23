@@ -51,8 +51,5 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           path: release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: release/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
