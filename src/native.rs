@@ -162,6 +162,10 @@ impl ApplicationHandler for App {
                         Key::Named(NamedKey::ArrowDown) => {
                             self.draw_intensity = (self.draw_intensity - 0.25).clamp(0.0, 1.0)
                         }
+                        Key::Character(ref c) if c == "c" => {
+                            self.grid.concentrations.fill(0.0);
+                            self.grid.sources.clear();
+                        }
                         _ => {}
                     }
                 }
