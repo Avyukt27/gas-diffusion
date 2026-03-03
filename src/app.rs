@@ -90,10 +90,10 @@ impl App {
                         let vel = (dx * strength, dy * strength);
                         let max_vel = self.grid.cell_size as f64 / DELTA * 0.5;
 
-                        self.grid.advection[idx].0 =
-                            (self.grid.advection[idx].0 + vel.0).clamp(-max_vel, max_vel);
-                        self.grid.advection[idx].1 =
-                            (self.grid.advection[idx].1 + vel.1).clamp(-max_vel, max_vel);
+                        self.grid.advections[idx].0 =
+                            (self.grid.advections[idx].0 + vel.0).clamp(-max_vel, max_vel);
+                        self.grid.advections[idx].1 =
+                            (self.grid.advections[idx].1 + vel.1).clamp(-max_vel, max_vel);
                     }
                     DrawMode::Stopper => {
                         self.grid.stoppers[idx] = true;
@@ -182,7 +182,7 @@ impl ApplicationHandler for App {
                         Key::Character(ref c) if c == "c" => {
                             self.grid.concentrations.fill(0.0);
                             self.grid.sources.fill(0.0);
-                            self.grid.advection.fill((0.0, 0.0));
+                            self.grid.advections.fill((0.0, 0.0));
                         }
                         _ => {}
                     }

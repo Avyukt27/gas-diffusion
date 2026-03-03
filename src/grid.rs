@@ -7,7 +7,7 @@ pub struct Grid {
     pub cell_size: usize,
     pub concentrations: Vec<f64>,
     pub sources: Vec<f64>,
-    pub advection: Vec<(f64, f64)>,
+    pub advections: Vec<(f64, f64)>,
     pub stoppers: Vec<bool>,
 }
 
@@ -23,7 +23,7 @@ impl Grid {
             cell_size,
             concentrations: vec![0.0; grid_width * grid_height],
             sources: vec![0.0; grid_width * grid_height],
-            advection: vec![(0.0, 0.0); grid_width * grid_height],
+            advections: vec![(0.0, 0.0); grid_width * grid_height],
             stoppers: vec![false; grid_width * grid_height],
         }
     }
@@ -124,7 +124,7 @@ impl Grid {
                 let idx = y * self.grid_width + x;
 
                 let concentration = self.concentrations[idx];
-                let advection_values = self.advection[idx];
+                let advection_values = self.advections[idx];
                 let neighbors = self.get_neighbors(idx, &self.concentrations);
 
                 let value_change =
@@ -148,7 +148,7 @@ impl Grid {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
                 let idx = y * self.grid_width + x;
-                let advection_values = self.advection[idx];
+                let advection_values = self.advections[idx];
                 let forward_advection = forward_advections[idx];
                 let neighbors = self.get_neighbors(idx, &forward_advections);
 
