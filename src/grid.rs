@@ -123,6 +123,11 @@ impl Grid {
             for x in 0..self.grid_width {
                 let idx = y * self.grid_width + x;
 
+                if self.stoppers[idx] {
+                    forward_advections[idx] = self.concentrations[idx];
+                    continue;
+                }
+
                 let concentration = self.concentrations[idx];
                 let advection_values = self.advection[idx];
                 let neighbors = self.get_neighbors(idx, &self.concentrations);
@@ -148,6 +153,12 @@ impl Grid {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
                 let idx = y * self.grid_width + x;
+
+                if self.stoppers[idx] {
+                    backward_advections[idx] = self.concentrations[idx];
+                    continue;
+                }
+
                 let advection_values = self.advection[idx];
                 let forward_advection = forward_advections[idx];
                 let neighbors = self.get_neighbors(idx, &forward_advections);
@@ -222,28 +233,42 @@ impl Grid {
         let y = idx / self.grid_width;
 
         let left = if x > 0 {
-            Some((values_grid[y * self.grid_width + (x - 1)], idx - 1))
+            let neighbor_idx = y * self.grid_width + (x - 1);
+            if !self.stoppers[neighbor_idx] {
+                Some((values_grid[neighbor_idx], idx - 1))
+            } else {
+                None
+            }
         } else {
             None
         };
         let right = if x + 1 < self.grid_width {
-            Some((values_grid[y * self.grid_width + (x + 1)], idx + 1))
+            let neighbor_idx = y * self.grid_width + (x + 1);
+            if !self.stoppers[neighbor_idx] {
+                Some((values_grid[neighbor_idx], idx + 1))
+            } else {
+                None
+            }
         } else {
             None
         };
         let up = if y > 0 {
-            Some((
-                values_grid[(y - 1) * self.grid_width + x],
-                idx - self.grid_width,
-            ))
+            let neighbor_idx = (y - 1) * self.grid_width + x;
+            if !self.stoppers[neighbor_idx] {
+                Some((values_grid[neighbor_idx], idx - self.grid_width))
+            } else {
+                None
+            }
         } else {
             None
         };
         let down = if y + 1 < self.grid_height {
-            Some((
-                values_grid[(y + 1) * self.grid_width + x],
-                idx + self.grid_width,
-            ))
+            let neighbor_idx = (y + 1) * self.grid_width + x;
+            if !self.stoppers[neighbor_idx] {
+                Some((values_grid[neighbor_idx], idx + self.grid_width))
+            } else {
+                None
+            }
         } else {
             None
         };

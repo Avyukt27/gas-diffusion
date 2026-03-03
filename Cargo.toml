@@ -6,6 +6,3 @@ edition = "2024"
 [dependencies]
 pixels = "0.15.0"
 winit = "0.30.12"
-
-[target.x86_64-pc-windows-gnu]
-rustflags = ["-C", "target-feature=+crt-static"]
