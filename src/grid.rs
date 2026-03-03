@@ -8,6 +8,7 @@ pub struct Grid {
     pub concentrations: Vec<f64>,
     pub sources: Vec<f64>,
     pub advection: Vec<(f64, f64)>,
+    pub stoppers: Vec<bool>,
 }
 
 impl Grid {
@@ -23,27 +24,22 @@ impl Grid {
             concentrations: vec![0.0; grid_width * grid_height],
             sources: vec![0.0; grid_width * grid_height],
             advection: vec![(0.0, 0.0); grid_width * grid_height],
+            stoppers: vec![false; grid_width * grid_height],
         }
     }
 
     pub fn draw(&self, buffer: &mut [u8]) {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
-                let colour = self.generate_heatmap(y * self.grid_width + x);
+                let idx = y * self.grid_width + x;
 
-                for dy in 0..self.cell_size {
-                    for dx in 0..self.cell_size {
-                        let pixel_x = x * self.cell_size + dx;
-                        let pixel_y = y * self.cell_size + dy;
-
-                        let idx = (pixel_y * self.screen_width + pixel_x) * 4;
-
-                        buffer[idx] = colour.red;
-                        buffer[idx + 1] = colour.green;
-                        buffer[idx + 2] = colour.blue;
-                        buffer[idx + 3] = colour.alpha;
-                    }
+                if self.stoppers[idx] {
+                    self.draw_cell(x, y, buffer, Colour::new(128, 128, 128, 255));
+                    continue;
                 }
+
+                let colour = self.generate_heatmap(idx);
+                self.draw_cell(x, y, buffer, colour);
             }
         }
     }
@@ -263,5 +259,21 @@ impl Grid {
 
     fn lerp(&self, a: f64, b: f64, t: f64) -> f64 {
         a + (b - a) * t
+    }
+
+    fn draw_cell(&self, x: usize, y: usize, buffer: &mut [u8], colour: Colour) {
+        for dy in 0..self.cell_size {
+            for dx in 0..self.cell_size {
+                let pixel_x = x * self.cell_size + dx;
+                let pixel_y = y * self.cell_size + dy;
+
+                let idx = (pixel_y * self.screen_width + pixel_x) * 4;
+
+                buffer[idx] = colour.red;
+                buffer[idx + 1] = colour.green;
+                buffer[idx + 2] = colour.blue;
+                buffer[idx + 3] = colour.alpha;
+            }
+        }
     }
 }
