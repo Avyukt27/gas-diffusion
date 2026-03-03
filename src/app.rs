@@ -22,6 +22,7 @@ enum DrawMode {
     Source,
     Sink,
     Advection,
+    Stopper,
 }
 
 pub struct App {
@@ -94,6 +95,9 @@ impl App {
                         self.grid.advection[idx].1 =
                             (self.grid.advection[idx].1 + vel.1).clamp(-max_vel, max_vel);
                     }
+                    DrawMode::Stopper => {
+                        self.grid.stoppers[idx] = true;
+                    }
                 }
             }
         }
@@ -117,7 +121,6 @@ impl ApplicationHandler for App {
 
         self.window = Some(window.clone());
         self.pixels = Some(pixels);
-        self.grid.stoppers[100] = true;
     }
 
     fn window_event(
@@ -167,7 +170,8 @@ impl ApplicationHandler for App {
                             DrawMode::Gas => self.draw_mode = DrawMode::Source,
                             DrawMode::Source => self.draw_mode = DrawMode::Sink,
                             DrawMode::Sink => self.draw_mode = DrawMode::Advection,
-                            DrawMode::Advection => self.draw_mode = DrawMode::Gas,
+                            DrawMode::Advection => self.draw_mode = DrawMode::Stopper,
+                            DrawMode::Stopper => self.draw_mode = DrawMode::Gas,
                         },
                         Key::Named(NamedKey::ArrowUp) => {
                             self.draw_intensity = (self.draw_intensity + 0.25).clamp(0.0, 1.0)
