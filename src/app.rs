@@ -117,6 +117,7 @@ impl ApplicationHandler for App {
 
         self.window = Some(window.clone());
         self.pixels = Some(pixels);
+        self.grid.stoppers[100] = true;
     }
 
     fn window_event(
