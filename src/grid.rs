@@ -8,6 +8,7 @@ pub struct Grid {
     pub concentrations: Vec<f64>,
     pub sources: Vec<f64>,
     pub advection: Vec<(f64, f64)>,
+    pub stoppers: Vec<bool>,
 }
 
 impl Grid {
@@ -23,27 +24,22 @@ impl Grid {
             concentrations: vec![0.0; grid_width * grid_height],
             sources: vec![0.0; grid_width * grid_height],
             advection: vec![(0.0, 0.0); grid_width * grid_height],
+            stoppers: vec![false; grid_width * grid_height],
         }
     }
 
     pub fn draw(&self, buffer: &mut [u8]) {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
-                let colour = self.generate_heatmap(y * self.grid_width + x);
+                let idx = y * self.grid_width + x;
 
-                for dy in 0..self.cell_size {
-                    for dx in 0..self.cell_size {
-                        let pixel_x = x * self.cell_size + dx;
-                        let pixel_y = y * self.cell_size + dy;
-
-                        let idx = (pixel_y * self.screen_width + pixel_x) * 4;
-
-                        buffer[idx] = colour.red;
-                        buffer[idx + 1] = colour.green;
-                        buffer[idx + 2] = colour.blue;
-                        buffer[idx + 3] = colour.alpha;
-                    }
+                if self.stoppers[idx] {
+                    self.draw_cell(x, y, buffer, Colour::new(128, 128, 128, 255));
+                    continue;
                 }
+
+                let colour = self.generate_heatmap(idx);
+                self.draw_cell(x, y, buffer, colour);
             }
         }
     }
@@ -55,14 +51,30 @@ impl Grid {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
                 let idx = y * self.grid_width + x;
+                if self.stoppers[idx] {
+                    next[idx] = 0.0;
+                    continue;
+                }
                 let source_rate = self.sources[idx];
                 let advection = advections[idx];
 
                 let neighbors = self.get_neighbors(idx, &advections);
-                let neighbor_sum: f64 = neighbors.into_iter().map(|v| v.unwrap_or(0.0)).sum();
+                let mut neighbor_sum = 0.0;
+                let mut fluid_count = 0.0;
+
+                for neighbor in neighbors.iter() {
+                    if let Some((value, idx)) = neighbor {
+                        if !self.stoppers[*idx] {
+                            neighbor_sum += value;
+                        } else {
+                            neighbor_sum += advection;
+                        }
+                        fluid_count += 1.0;
+                    }
+                }
 
                 next[idx] = (advection
-                    + diffusion_coefficient * delta * (neighbor_sum - 4.0 * advection)
+                    + diffusion_coefficient * delta * (neighbor_sum - fluid_count * advection)
                         / (self.cell_size * self.cell_size) as f64
                     + source_rate)
                     .max(0.0);
@@ -75,28 +87,28 @@ impl Grid {
     fn get_value_change(
         &self,
         value: f64,
-        neighbors: [Option<f64>; 4],
+        neighbors: [Option<(f64, usize)>; 4],
         advection_values: (f64, f64),
     ) -> (f64, f64) {
         let concentration_change_x = if advection_values.0 > 0.0
             && let Some(concentration_left) = neighbors[0]
         {
-            (value - concentration_left) / self.cell_size as f64
+            (value - concentration_left.0) / self.cell_size as f64
         } else if advection_values.0 < 0.0
             && let Some(concentration_right) = neighbors[1]
         {
-            (concentration_right - value) / self.cell_size as f64
+            (concentration_right.0 - value) / self.cell_size as f64
         } else {
             0.0
         };
         let concentration_change_y = if advection_values.1 > 0.0
             && let Some(concentration_up) = neighbors[2]
         {
-            (value - concentration_up) / self.cell_size as f64
+            (value - concentration_up.0) / self.cell_size as f64
         } else if advection_values.1 < 0.0
             && let Some(concentration_down) = neighbors[3]
         {
-            (concentration_down - value) / self.cell_size as f64
+            (concentration_down.0 - value) / self.cell_size as f64
         } else {
             0.0
         };
@@ -113,7 +125,7 @@ impl Grid {
 
                 let concentration = self.concentrations[idx];
                 let advection_values = self.advection[idx];
-                let neighbors: [Option<f64>; 4] = self.get_neighbors(idx, &self.concentrations);
+                let neighbors = self.get_neighbors(idx, &self.concentrations);
 
                 let value_change =
                     self.get_value_change(concentration, neighbors, advection_values);
@@ -138,7 +150,7 @@ impl Grid {
                 let idx = y * self.grid_width + x;
                 let advection_values = self.advection[idx];
                 let forward_advection = forward_advections[idx];
-                let neighbors: [Option<f64>; 4] = self.get_neighbors(idx, &forward_advections);
+                let neighbors = self.get_neighbors(idx, &forward_advections);
 
                 let value_change = self.get_value_change(
                     forward_advection,
@@ -192,8 +204,8 @@ impl Grid {
                 for neighbor in neighbors {
                     match neighbor {
                         Some(n) => {
-                            min_advection = min_advection.min(n);
-                            max_advection = max_advection.max(n);
+                            min_advection = min_advection.min(n.0);
+                            max_advection = max_advection.max(n.0);
                         }
                         None => {}
                     }
@@ -205,27 +217,33 @@ impl Grid {
         advections
     }
 
-    fn get_neighbors(&self, idx: usize, values_grid: &Vec<f64>) -> [Option<f64>; 4] {
+    fn get_neighbors(&self, idx: usize, values_grid: &Vec<f64>) -> [Option<(f64, usize)>; 4] {
         let x = idx % self.grid_width;
         let y = idx / self.grid_width;
 
         let left = if x > 0 {
-            Some(values_grid[y * self.grid_width + (x - 1)])
+            Some((values_grid[y * self.grid_width + (x - 1)], idx - 1))
         } else {
             None
         };
         let right = if x + 1 < self.grid_width {
-            Some(values_grid[y * self.grid_width + (x + 1)])
+            Some((values_grid[y * self.grid_width + (x + 1)], idx + 1))
         } else {
             None
         };
         let up = if y > 0 {
-            Some(values_grid[(y - 1) * self.grid_width + x])
+            Some((
+                values_grid[(y - 1) * self.grid_width + x],
+                idx - self.grid_width,
+            ))
         } else {
             None
         };
         let down = if y + 1 < self.grid_height {
-            Some(values_grid[(y + 1) * self.grid_width + x])
+            Some((
+                values_grid[(y + 1) * self.grid_width + x],
+                idx + self.grid_width,
+            ))
         } else {
             None
         };
@@ -263,5 +281,21 @@ impl Grid {
 
     fn lerp(&self, a: f64, b: f64, t: f64) -> f64 {
         a + (b - a) * t
+    }
+
+    fn draw_cell(&self, x: usize, y: usize, buffer: &mut [u8], colour: Colour) {
+        for dy in 0..self.cell_size {
+            for dx in 0..self.cell_size {
+                let pixel_x = x * self.cell_size + dx;
+                let pixel_y = y * self.cell_size + dy;
+
+                let idx = (pixel_y * self.screen_width + pixel_x) * 4;
+
+                buffer[idx] = colour.red;
+                buffer[idx + 1] = colour.green;
+                buffer[idx + 2] = colour.blue;
+                buffer[idx + 3] = colour.alpha;
+            }
+        }
     }
 }
