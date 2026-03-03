@@ -47,6 +47,26 @@ impl Grid {
     pub fn update(&mut self, diffusion_coefficient: f64, delta: f64) {
         let mut next = self.concentrations.clone();
         let advections = self.get_advections(delta);
+        let mut total_mass = 0.0;
+        let mut total_div = 0.0;
+
+        for y in 1..self.grid_height - 1 {
+            for x in 1..self.grid_width - 1 {
+                let idx = y * self.grid_width + x;
+
+                let u = self.advection[idx].0;
+                let v = self.advection[idx].1;
+
+                let u_left = self.advection[y * self.grid_width + (x - 1)].0;
+                let v_up = self.advection[(y - 1) * self.grid_width + x].1;
+
+                let divergence =
+                    (u - u_left) / self.cell_size as f64 + (v - v_up) / self.cell_size as f64;
+
+                total_div += divergence.abs();
+                total_mass += self.concentrations[idx];
+            }
+        }
 
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
