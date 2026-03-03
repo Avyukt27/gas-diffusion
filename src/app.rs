@@ -95,7 +95,7 @@ impl App {
                         self.grid.advection[idx].1 =
                             (self.grid.advection[idx].1 + vel.1).clamp(-max_vel, max_vel);
                     }
-                    DrawMode::Stopper => self.grid.stoppers[idx] = true,
+                    DrawMode::Stopper => self.grid.walls[idx] = true,
                 }
             }
         }
@@ -181,7 +181,7 @@ impl ApplicationHandler for App {
                             self.grid.concentrations.fill(0.0);
                             self.grid.sources.fill(0.0);
                             self.grid.advection.fill((0.0, 0.0));
-                            self.grid.stoppers.fill(false);
+                            self.grid.walls.fill(false);
                         }
                         _ => {}
                     }

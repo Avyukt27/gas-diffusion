@@ -8,7 +8,7 @@ pub struct Grid {
     pub concentrations: Vec<f64>,
     pub sources: Vec<f64>,
     pub advection: Vec<(f64, f64)>,
-    pub stoppers: Vec<bool>,
+    pub walls: Vec<bool>,
 }
 
 impl Grid {
@@ -24,7 +24,7 @@ impl Grid {
             concentrations: vec![0.0; grid_width * grid_height],
             sources: vec![0.0; grid_width * grid_height],
             advection: vec![(0.0, 0.0); grid_width * grid_height],
-            stoppers: vec![false; grid_width * grid_height],
+            walls: vec![false; grid_width * grid_height],
         }
     }
 
@@ -33,7 +33,7 @@ impl Grid {
             for x in 0..self.grid_width {
                 let idx = y * self.grid_width + x;
 
-                if self.stoppers[idx] {
+                if self.walls[idx] {
                     self.draw_cell(x, y, buffer, Colour::new(128, 128, 128, 255));
                     continue;
                 }
@@ -51,7 +51,7 @@ impl Grid {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
                 let idx = y * self.grid_width + x;
-                if self.stoppers[idx] {
+                if self.walls[idx] {
                     next[idx] = 0.0;
                     continue;
                 }
@@ -64,7 +64,7 @@ impl Grid {
 
                 for neighbor in neighbors.iter() {
                     if let Some((value, idx)) = neighbor {
-                        if !self.stoppers[*idx] {
+                        if !self.walls[*idx] {
                             neighbor_sum += value;
                         } else {
                             neighbor_sum += advection;
@@ -73,11 +73,10 @@ impl Grid {
                     }
                 }
 
-                next[idx] = (advection
+                next[idx] = advection
                     + diffusion_coefficient * delta * (neighbor_sum - fluid_count * advection)
                         / (self.cell_size * self.cell_size) as f64
-                    + source_rate)
-                    .max(0.0);
+                    + source_rate;
             }
         }
 
@@ -123,7 +122,7 @@ impl Grid {
             for x in 0..self.grid_width {
                 let idx = y * self.grid_width + x;
 
-                if self.stoppers[idx] {
+                if self.walls[idx] {
                     forward_advections[idx] = self.concentrations[idx];
                     continue;
                 }
@@ -154,7 +153,7 @@ impl Grid {
             for x in 0..self.grid_width {
                 let idx = y * self.grid_width + x;
 
-                if self.stoppers[idx] {
+                if self.walls[idx] {
                     backward_advections[idx] = self.concentrations[idx];
                     continue;
                 }
@@ -234,7 +233,7 @@ impl Grid {
 
         let left = if x > 0 {
             let neighbor_idx = y * self.grid_width + (x - 1);
-            if !self.stoppers[neighbor_idx] {
+            if !self.walls[neighbor_idx] {
                 Some((values_grid[neighbor_idx], idx - 1))
             } else {
                 None
@@ -244,7 +243,7 @@ impl Grid {
         };
         let right = if x + 1 < self.grid_width {
             let neighbor_idx = y * self.grid_width + (x + 1);
-            if !self.stoppers[neighbor_idx] {
+            if !self.walls[neighbor_idx] {
                 Some((values_grid[neighbor_idx], idx + 1))
             } else {
                 None
@@ -254,7 +253,7 @@ impl Grid {
         };
         let up = if y > 0 {
             let neighbor_idx = (y - 1) * self.grid_width + x;
-            if !self.stoppers[neighbor_idx] {
+            if !self.walls[neighbor_idx] {
                 Some((values_grid[neighbor_idx], idx - self.grid_width))
             } else {
                 None
@@ -264,7 +263,7 @@ impl Grid {
         };
         let down = if y + 1 < self.grid_height {
             let neighbor_idx = (y + 1) * self.grid_width + x;
-            if !self.stoppers[neighbor_idx] {
+            if !self.walls[neighbor_idx] {
                 Some((values_grid[neighbor_idx], idx + self.grid_width))
             } else {
                 None
