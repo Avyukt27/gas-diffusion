@@ -95,9 +95,6 @@ impl App {
                         self.grid.advections[idx].1 =
                             (self.grid.advections[idx].1 + vel.1).clamp(-max_vel, max_vel);
                     }
-                    DrawMode::Stopper => {
-                        self.grid.stoppers[idx] = true;
-                    }
                     DrawMode::Stopper => self.grid.walls[idx] = true,
                 }
             }
