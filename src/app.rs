@@ -98,6 +98,7 @@ impl App {
                     DrawMode::Stopper => {
                         self.grid.stoppers[idx] = true;
                     }
+                    DrawMode::Stopper => self.grid.walls[idx] = true,
                 }
             }
         }
@@ -183,6 +184,7 @@ impl ApplicationHandler for App {
                             self.grid.concentrations.fill(0.0);
                             self.grid.sources.fill(0.0);
                             self.grid.advections.fill((0.0, 0.0));
+                            self.grid.walls.fill(false);
                         }
                         _ => {}
                     }
