@@ -33,7 +33,7 @@ pub struct App {
     delta: f64,
     grid: Grid,
 
-    ui_context: Option<Context>,
+    ui_context: Context,
     ui_state: Option<State>,
     ui_renderer: Option<Renderer>,
 
@@ -53,7 +53,7 @@ impl App {
             delta: 1.0,
             grid: Grid::new(WIDTH, HEIGHT, 10),
 
-            ui_context: None,
+            ui_context: Context::default(),
             ui_state: None,
             ui_renderer: None,
 
@@ -131,19 +131,19 @@ impl ApplicationHandler for App {
         let surface = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, window.clone());
         let pixels = Pixels::new(WIDTH as u32, HEIGHT as u32, surface).unwrap();
 
-        let context = Context::default();
         let state = State::new(
-            context.clone(),
+            self.ui_context.clone(),
             egui::ViewportId::ROOT,
             &window,
             None,
             None,
-            None,
         );
-        let renderer = Renderer::new(pixels.device(), pixels.render_texture_format(), None);
+        let renderer = Renderer::new(pixels.device(), pixels.render_texture_format(), None, 1);
 
-        self.window = Some(window.clone());
+        self.window = Some(window);
         self.pixels = Some(pixels);
+        self.ui_state = Some(state);
+        self.ui_renderer = Some(renderer);
     }
 
     fn window_event(
@@ -164,6 +164,10 @@ impl ApplicationHandler for App {
                 let bg_colour: Colour = Colour::new(0, 0, 0, 255);
 
                 self.grid.update(DIFFUSION, self.delta);
+
+                let window = self.window.as_ref().unwrap();
+                window.scale_factor();
+                let raw_input = self.ui_state.as_mut().unwrap().take_egui_input(window);
 
                 if let Some(pixels) = &mut self.pixels {
                     let frame = pixels.frame_mut();
