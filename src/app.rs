@@ -3,7 +3,6 @@ use std::sync::Arc;
 use egui::Context;
 use egui_wgpu::Renderer;
 use egui_winit::State;
-use pixels::{Pixels, SurfaceTexture};
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use winit::{
     application::ApplicationHandler,
@@ -146,10 +145,43 @@ impl ApplicationHandler for App {
                     .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64)),
             )
             .unwrap();
-
+        let size = window.inner_size();
         let window = Arc::new(window);
-
         self.window = Some(window.clone());
+
+        let instance = wgpu::Instance::default();
+        let surface = instance.create_surface(window.clone()).unwrap();
+        self.surface = Some(surface);
+
+        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            compatible_surface: Some(self.surface.as_ref().unwrap()),
+            force_fallback_adapter: false,
+        }))
+        .unwrap();
+        let (device, queue) =
+            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).unwrap();
+
+        self.device = Some(device.clone());
+        self.queue = Some(queue);
+
+        let surface_capabilities = self.surface.as_ref().unwrap().get_capabilities(&adapter);
+        let surface_format = surface_capabilities.formats[0];
+        let surface_config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_format,
+            width: size.width,
+            height: size.height,
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: surface_capabilities.alpha_modes[0],
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        };
+        self.surface
+            .as_ref()
+            .unwrap()
+            .configure(&device, &surface_config);
+        self.config = Some(surface_config);
     }
 
     fn window_event(
@@ -160,31 +192,11 @@ impl ApplicationHandler for App {
     ) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => {
-                if let Some(pixels) = &mut self.pixels {
-                    pixels.resize_surface(size.width, size.height).unwrap();
-                    pixels.resize_buffer(size.width, size.height).unwrap();
-                }
-            }
             WindowEvent::RedrawRequested => {
                 let bg_colour: Colour = Colour::new(0, 0, 0, 255);
 
-                self.grid.update(DIFFUSION, self.delta);
-
                 let window = self.window.as_ref().unwrap();
                 window.scale_factor();
-
-                if let Some(pixels) = &mut self.pixels {
-                    let frame = pixels.frame_mut();
-                    for pixel in frame.chunks_exact_mut(4) {
-                        pixel[0] = bg_colour.red;
-                        pixel[1] = bg_colour.green;
-                        pixel[2] = bg_colour.blue;
-                        pixel[3] = bg_colour.alpha;
-                    }
-                    self.grid.draw(frame);
-                    pixels.render().unwrap();
-                }
 
                 if let Some(window) = &self.window {
                     window.request_redraw();
