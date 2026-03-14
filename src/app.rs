@@ -1,5 +1,8 @@
 use std::sync::Arc;
 
+use egui::Context;
+use egui_wgpu::Renderer;
+use egui_winit::State;
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
     application::ApplicationHandler,
@@ -29,6 +32,11 @@ pub struct App {
     pixels: Option<Pixels<'static>>,
     delta: f64,
     grid: Grid,
+
+    ui_context: Option<Context>,
+    ui_state: Option<State>,
+    ui_renderer: Option<Renderer>,
+
     draw_mode: DrawMode,
     draw_size: usize,
     draw_intensity: f64,
@@ -44,6 +52,11 @@ impl App {
             pixels: None,
             delta: 1.0,
             grid: Grid::new(WIDTH, HEIGHT, 10),
+
+            ui_context: None,
+            ui_state: None,
+            ui_renderer: None,
+
             draw_mode: DrawMode::Gas,
             draw_size: 1,
             draw_intensity: 1.0,
@@ -117,6 +130,17 @@ impl ApplicationHandler for App {
 
         let surface = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, window.clone());
         let pixels = Pixels::new(WIDTH as u32, HEIGHT as u32, surface).unwrap();
+
+        let context = Context::default();
+        let state = State::new(
+            context.clone(),
+            egui::ViewportId::ROOT,
+            &window,
+            None,
+            None,
+            None,
+        );
+        let renderer = Renderer::new(pixels.device(), pixels.render_texture_format(), None);
 
         self.window = Some(window.clone());
         self.pixels = Some(pixels);
