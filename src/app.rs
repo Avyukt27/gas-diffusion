@@ -167,7 +167,6 @@ impl ApplicationHandler for App {
 
                 let window = self.window.as_ref().unwrap();
                 window.scale_factor();
-                let raw_input = self.ui_state.as_mut().unwrap().take_egui_input(window);
 
                 if let Some(pixels) = &mut self.pixels {
                     let frame = pixels.frame_mut();
