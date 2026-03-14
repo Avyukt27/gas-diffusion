@@ -16,6 +16,7 @@ use crate::grid::Grid;
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
+const CELL_SIZE: usize = 10;
 const DIFFUSION: f64 = 2.0;
 
 #[derive(PartialEq, Eq, Debug)]
@@ -39,6 +40,7 @@ pub struct App {
     texture_view: Option<wgpu::TextureView>,
     sampler: Option<wgpu::Sampler>,
     render_pipeline: Option<wgpu::RenderPipeline>,
+    buffer: Vec<u8>,
 
     ui_context: Context,
     ui_state: Option<State>,
@@ -69,13 +71,14 @@ impl App {
             texture_view: None,
             sampler: None,
             render_pipeline: None,
+            buffer: vec![0u8; 4 * WIDTH * HEIGHT],
 
             ui_context: Context::default(),
             ui_state: None,
             ui_renderer: None,
 
             delta: 1.0,
-            grid: Grid::new(WIDTH, HEIGHT, 10),
+            grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
 
             draw_mode: DrawMode::Gas,
             draw_size: 1,
@@ -181,6 +184,28 @@ impl ApplicationHandler for App {
             .unwrap()
             .configure(&device, &surface_config);
         self.config = Some(surface_config);
+
+        let texture = self
+            .device
+            .as_ref()
+            .unwrap()
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("Test texture"),
+                size: wgpu::Extent3d {
+                    width: WIDTH as u32,
+                    height: HEIGHT as u32,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.texture = Some(texture);
+        self.texture_view = Some(texture_view);
     }
 
     fn window_event(
@@ -192,6 +217,15 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
+                let mut data = vec![0u8; 800 * 600 * 4];
+
+                for i in (0..data.len()).step_by(4) {
+                    data[i] = 255;
+                    data[i + 1] = 0;
+                    data[i + 2] = 0;
+                    data[i + 3] = 255;
+                }
+
                 let frame = match self.surface.as_ref().unwrap().get_current_texture() {
                     Ok(frame) => frame,
                     Err(wgpu::SurfaceError::Lost) => {
@@ -219,6 +253,26 @@ impl ApplicationHandler for App {
                 let mut encoder = self.device.as_ref().unwrap().create_command_encoder(
                     &wgpu::CommandEncoderDescriptor {
                         label: Some("Render Encoder"),
+                    },
+                );
+
+                self.queue.as_ref().unwrap().write_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &self.texture.as_ref().unwrap(),
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    &self.buffer,
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some((4 * WIDTH / CELL_SIZE) as u32),
+                        rows_per_image: Some((4 * HEIGHT / CELL_SIZE) as u32),
+                    },
+                    wgpu::Extent3d {
+                        width: (4 * WIDTH / CELL_SIZE) as u32,
+                        height: (4 * HEIGHT / CELL_SIZE) as u32,
+                        depth_or_array_layers: 1,
                     },
                 );
 
