@@ -14,7 +14,6 @@ use crate::{colour::Colour, grid::Grid};
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
 const DIFFUSION: f64 = 2.0;
-const DELTA: f64 = 1.0;
 
 #[derive(PartialEq, Eq, Debug)]
 enum DrawMode {
@@ -28,6 +27,7 @@ enum DrawMode {
 pub struct App {
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
+    delta: f64,
     grid: Grid,
     draw_mode: DrawMode,
     draw_size: usize,
@@ -42,6 +42,7 @@ impl App {
         Self {
             window: None,
             pixels: None,
+            delta: 1.0,
             grid: Grid::new(WIDTH, HEIGHT, 10),
             draw_mode: DrawMode::Gas,
             draw_size: 1,
@@ -88,7 +89,7 @@ impl App {
                         let dy = start_y as f64 - prev_cell_y as f64;
                         let strength = 5.0;
                         let vel = (dx * strength, dy * strength);
-                        let max_vel = self.grid.cell_size as f64 / DELTA * 0.5;
+                        let max_vel = self.grid.cell_size as f64 / self.delta * 0.5;
 
                         self.grid.advections[idx].0 =
                             (self.grid.advections[idx].0 + vel.0).clamp(-max_vel, max_vel);
@@ -138,7 +139,7 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 let bg_colour: Colour = Colour::new(0, 0, 0, 255);
 
-                self.grid.update(DIFFUSION, DELTA);
+                self.grid.update(DIFFUSION, self.delta);
 
                 if let Some(pixels) = &mut self.pixels {
                     let frame = pixels.frame_mut();
@@ -176,6 +177,13 @@ impl ApplicationHandler for App {
                         }
                         Key::Named(NamedKey::ArrowDown) => {
                             self.draw_intensity = (self.draw_intensity - 0.25).clamp(0.0, 1.0)
+                        }
+                        Key::Named(NamedKey::Enter) => {
+                            if self.delta != 0.0 {
+                                self.delta = 0.0;
+                            } else {
+                                self.delta = 1.0;
+                            }
                         }
                         Key::Character(ref c) if c == "c" => {
                             self.grid.concentrations.fill(0.0);
