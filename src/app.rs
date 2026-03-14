@@ -12,7 +12,7 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-use crate::{colour::Colour, grid::Grid};
+use crate::grid::Grid;
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
@@ -193,10 +193,38 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
-                let bg_colour: Colour = Colour::new(0, 0, 0, 255);
+                let frame = self
+                    .surface
+                    .as_ref()
+                    .unwrap()
+                    .get_current_texture()
+                    .unwrap();
+                let view = frame.texture.create_view(&Default::default());
+                let mut encoder = self.device.as_ref().unwrap().create_command_encoder(
+                    &wgpu::CommandEncoderDescriptor {
+                        label: Some("Render Encoder"),
+                    },
+                );
 
-                let window = self.window.as_ref().unwrap();
-                window.scale_factor();
+                let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Render Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.2,
+                                g: 0.3,
+                                b: 0.7,
+                                a: 1.0,
+                            }),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
 
                 if let Some(window) = &self.window {
                     window.request_redraw();
