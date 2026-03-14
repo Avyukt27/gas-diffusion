@@ -4,6 +4,7 @@ use egui::Context;
 use egui_wgpu::Renderer;
 use egui_winit::State;
 use pixels::{Pixels, SurfaceTexture};
+use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalPosition,
@@ -29,13 +30,23 @@ enum DrawMode {
 
 pub struct App {
     window: Option<Arc<Window>>,
-    pixels: Option<Pixels<'static>>,
-    delta: f64,
-    grid: Grid,
+
+    surface: Option<wgpu::Surface<'static>>,
+    device: Option<wgpu::Device>,
+    queue: Option<wgpu::Queue>,
+    config: Option<wgpu::SurfaceConfiguration>,
+
+    texture: Option<wgpu::Texture>,
+    texture_view: Option<wgpu::TextureView>,
+    sampler: Option<wgpu::Sampler>,
+    render_pipeline: Option<wgpu::RenderPipeline>,
 
     ui_context: Context,
     ui_state: Option<State>,
     ui_renderer: Option<Renderer>,
+
+    delta: f64,
+    grid: Grid,
 
     draw_mode: DrawMode,
     draw_size: usize,
@@ -49,13 +60,23 @@ impl App {
     pub fn new() -> Self {
         Self {
             window: None,
-            pixels: None,
-            delta: 1.0,
-            grid: Grid::new(WIDTH, HEIGHT, 10),
+
+            surface: None,
+            device: None,
+            queue: None,
+            config: None,
+
+            texture: None,
+            texture_view: None,
+            sampler: None,
+            render_pipeline: None,
 
             ui_context: Context::default(),
             ui_state: None,
             ui_renderer: None,
+
+            delta: 1.0,
+            grid: Grid::new(WIDTH, HEIGHT, 10),
 
             draw_mode: DrawMode::Gas,
             draw_size: 1,
@@ -128,22 +149,7 @@ impl ApplicationHandler for App {
 
         let window = Arc::new(window);
 
-        let surface = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, window.clone());
-        let pixels = Pixels::new(WIDTH as u32, HEIGHT as u32, surface).unwrap();
-
-        let state = State::new(
-            self.ui_context.clone(),
-            egui::ViewportId::ROOT,
-            &window,
-            None,
-            None,
-        );
-        let renderer = Renderer::new(pixels.device(), pixels.render_texture_format(), None, 1);
-
-        self.window = Some(window);
-        self.pixels = Some(pixels);
-        self.ui_state = Some(state);
-        self.ui_renderer = Some(renderer);
+        self.window = Some(window.clone());
     }
 
     fn window_event(
