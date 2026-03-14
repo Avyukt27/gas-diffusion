@@ -193,12 +193,29 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
-                let frame = self
-                    .surface
-                    .as_ref()
-                    .unwrap()
-                    .get_current_texture()
-                    .unwrap();
+                let frame = match self.surface.as_ref().unwrap().get_current_texture() {
+                    Ok(frame) => frame,
+                    Err(wgpu::SurfaceError::Lost) => {
+                        let config = self.config.as_ref().unwrap();
+                        self.surface
+                            .as_ref()
+                            .unwrap()
+                            .configure(self.device.as_ref().unwrap(), config);
+                        return;
+                    }
+                    Err(wgpu::SurfaceError::Outdated) => {
+                        return;
+                    }
+                    Err(wgpu::SurfaceError::Timeout) => {
+                        return;
+                    }
+                    Err(wgpu::SurfaceError::OutOfMemory) => {
+                        panic!("Out of GPU memory");
+                    }
+                    Err(wgpu::SurfaceError::Other) => {
+                        panic!("Other error!");
+                    }
+                };
                 let view = frame.texture.create_view(&Default::default());
                 let mut encoder = self.device.as_ref().unwrap().create_command_encoder(
                     &wgpu::CommandEncoderDescriptor {
@@ -206,25 +223,31 @@ impl ApplicationHandler for App {
                     },
                 );
 
-                let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Render Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.2,
-                                g: 0.3,
-                                b: 0.7,
-                                a: 1.0,
-                            }),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                });
+                {
+                    let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Render Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &view,
+                            resolve_target: None,
+                            depth_slice: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: 0.2,
+                                    g: 0.3,
+                                    b: 0.7,
+                                    a: 1.0,
+                                }),
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+                }
+
+                self.queue.as_ref().unwrap().submit(Some(encoder.finish()));
+                frame.present();
 
                 if let Some(window) = &self.window {
                     window.request_redraw();

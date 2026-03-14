@@ -1,7 +1,6 @@
 use winit::event_loop::EventLoop;
 
 mod app;
-mod colour;
 mod grid;
 
 fn main() {
