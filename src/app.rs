@@ -145,7 +145,6 @@ impl ApplicationHandler for App {
                     .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64)),
             )
             .unwrap();
-        let size = window.inner_size();
         let window = Arc::new(window);
         self.window = Some(window.clone());
 
@@ -170,8 +169,8 @@ impl ApplicationHandler for App {
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
-            width: size.width,
-            height: size.height,
+            width: WIDTH as u32,
+            height: HEIGHT as u32,
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: surface_capabilities.alpha_modes[0],
             view_formats: vec![],
@@ -232,9 +231,9 @@ impl ApplicationHandler for App {
                             depth_slice: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.2,
-                                    g: 0.3,
-                                    b: 0.7,
+                                    r: 0.0,
+                                    g: 0.0,
+                                    b: 0.0,
                                     a: 1.0,
                                 }),
                                 store: wgpu::StoreOp::Store,
@@ -247,6 +246,7 @@ impl ApplicationHandler for App {
                 }
 
                 self.queue.as_ref().unwrap().submit(Some(encoder.finish()));
+
                 frame.present();
 
                 if let Some(window) = &self.window {
