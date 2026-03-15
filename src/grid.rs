@@ -1,4 +1,16 @@
-use wgpu::Color;
+#[derive(Copy, Clone)]
+struct Colour {
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
+}
+
+impl Colour {
+    pub fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self { r, g, b, a }
+    }
+}
 
 pub struct Grid {
     screen_width: usize,
@@ -34,17 +46,7 @@ impl Grid {
                 let idx = y * self.grid_width + x;
 
                 if self.walls[idx] {
-                    self.draw_cell(
-                        x,
-                        y,
-                        buffer,
-                        Color {
-                            r: 0.5,
-                            g: 0.5,
-                            b: 0.5,
-                            a: 1.0,
-                        },
-                    );
+                    self.draw_cell(x, y, buffer, Colour::new(128, 128, 128, 255));
                     continue;
                 }
 
@@ -367,55 +369,15 @@ impl Grid {
         [left, right, up, down]
     }
 
-    fn generate_heatmap(&self, idx: usize) -> Color {
+    fn generate_heatmap(&self, idx: usize) -> Colour {
         let concentration = self.concentrations[idx].clamp(0.0, 1.0);
 
         let stops = [
-            (
-                0.01,
-                Color {
-                    r: 0.0,
-                    g: 0.0,
-                    b: 0.294,
-                    a: 1.0,
-                },
-            ),
-            (
-                0.25,
-                Color {
-                    r: 0.0,
-                    g: 0.8,
-                    b: 1.0,
-                    a: 1.0,
-                },
-            ),
-            (
-                0.5,
-                Color {
-                    r: 0.0,
-                    g: 1.0,
-                    b: 0.0,
-                    a: 1.0,
-                },
-            ),
-            (
-                0.75,
-                Color {
-                    r: 1.0,
-                    g: 1.0,
-                    b: 0.0,
-                    a: 1.0,
-                },
-            ),
-            (
-                1.0,
-                Color {
-                    r: 1.0,
-                    g: 0.0,
-                    b: 0.0,
-                    a: 1.0,
-                },
-            ),
+            (0.01, Colour::new(0, 0, 75, 255)),
+            (0.25, Colour::new(0, 204, 255, 255)),
+            (0.5, Colour::new(0, 255, 0, 255)),
+            (0.75, Colour::new(255, 255, 0, 255)),
+            (1.0, Colour::new(255, 0, 0, 255)),
         ];
 
         for i in 0..(stops.len() - 1) {
@@ -425,27 +387,22 @@ impl Grid {
             if concentration >= concentration0 && concentration <= concentration1 {
                 let a = (concentration - concentration0) / (concentration1 - concentration0);
 
-                let r = self.lerp(colour0.r, colour1.r, a);
-                let g = self.lerp(colour0.g, colour1.g, a);
-                let b = self.lerp(colour0.b, colour1.b, a);
+                let r = self.lerp(colour0.r as f64, colour1.r as f64, a);
+                let g = self.lerp(colour0.g as f64, colour1.g as f64, a);
+                let b = self.lerp(colour0.b as f64, colour1.b as f64, a);
 
-                return Color { r, g, b, a: 1.0 };
+                return Colour::new(r as u8, g as u8, b as u8, 255);
             }
         }
 
-        Color {
-            r: 0.0,
-            g: 0.0,
-            b: 0.0,
-            a: 0.0,
-        }
+        Colour::new(0, 0, 0, 255)
     }
 
     fn lerp(&self, a: f64, b: f64, t: f64) -> f64 {
         a + (b - a) * t
     }
 
-    fn draw_cell(&self, x: usize, y: usize, buffer: &mut [u8], colour: Color) {
+    fn draw_cell(&self, x: usize, y: usize, buffer: &mut [u8], colour: Colour) {
         for dy in 0..self.cell_size {
             for dx in 0..self.cell_size {
                 let pixel_x = x * self.cell_size + dx;
@@ -453,10 +410,10 @@ impl Grid {
 
                 let idx = (pixel_y * self.screen_width + pixel_x) * 4;
 
-                buffer[idx] = (colour.r * 255.0).round() as u8;
-                buffer[idx + 1] = (colour.g * 255.0).round() as u8;
-                buffer[idx + 2] = (colour.b * 255.0).round() as u8;
-                buffer[idx + 3] = (colour.a * 255.0).round() as u8;
+                buffer[idx] = colour.r;
+                buffer[idx + 1] = colour.g;
+                buffer[idx + 2] = colour.b;
+                buffer[idx + 3] = colour.a;
             }
         }
     }
