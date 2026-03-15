@@ -1,9 +1,5 @@
 use std::sync::Arc;
 
-use egui::Context;
-use egui_wgpu::Renderer;
-use egui_winit::State;
-use pixels::{Pixels, SurfaceTexture};
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalPosition,
@@ -12,10 +8,11 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-use crate::{colour::Colour, grid::Grid};
+use crate::{grid::Grid, renderer::Renderer};
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
+const CELL_SIZE: usize = 10;
 const DIFFUSION: f64 = 2.0;
 
 #[derive(PartialEq, Eq, Debug)]
@@ -29,13 +26,10 @@ enum DrawMode {
 
 pub struct App {
     window: Option<Arc<Window>>,
-    pixels: Option<Pixels<'static>>,
     delta: f64,
+    buffer: Vec<u8>,
+    renderer: Option<Renderer>,
     grid: Grid,
-
-    ui_context: Context,
-    ui_state: Option<State>,
-    ui_renderer: Option<Renderer>,
 
     draw_mode: DrawMode,
     draw_size: usize,
@@ -49,13 +43,10 @@ impl App {
     pub fn new() -> Self {
         Self {
             window: None,
-            pixels: None,
             delta: 1.0,
-            grid: Grid::new(WIDTH, HEIGHT, 10),
-
-            ui_context: Context::default(),
-            ui_state: None,
-            ui_renderer: None,
+            buffer: vec![0u8; 4 * (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
+            renderer: None,
+            grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
 
             draw_mode: DrawMode::Gas,
             draw_size: 1,
@@ -75,16 +66,16 @@ impl App {
         width: usize,
         height: usize,
     ) {
-        if start_x >= self.grid.grid_width || start_y >= self.grid.grid_height {
+        if start_x >= self.grid.width || start_y >= self.grid.height {
             return;
         }
 
-        let max_x = (start_x + width).min(self.grid.grid_width);
-        let max_y = (start_y + height).min(self.grid.grid_height);
+        let max_x = (start_x + width).min(self.grid.width);
+        let max_y = (start_y + height).min(self.grid.height);
 
         for y in start_y..max_y {
             for x in start_x..max_x {
-                let idx = y * self.grid.grid_width + x;
+                let idx = y * self.grid.width + x;
                 match self.draw_mode {
                     DrawMode::Gas => {
                         self.grid.concentrations[idx] = self.draw_intensity.clamp(0.0, 1.0);
@@ -125,25 +116,15 @@ impl ApplicationHandler for App {
                     .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64)),
             )
             .unwrap();
-
         let window = Arc::new(window);
-
-        let surface = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, window.clone());
-        let pixels = Pixels::new(WIDTH as u32, HEIGHT as u32, surface).unwrap();
-
-        let state = State::new(
-            self.ui_context.clone(),
-            egui::ViewportId::ROOT,
-            &window,
-            None,
-            None,
-        );
-        let renderer = Renderer::new(pixels.device(), pixels.render_texture_format(), None, 1);
-
+        let renderer = pollster::block_on(Renderer::new(
+            window.clone(),
+            WIDTH as u32,
+            HEIGHT as u32,
+            CELL_SIZE as u32,
+        ));
         self.window = Some(window);
-        self.pixels = Some(pixels);
-        self.ui_state = Some(state);
-        self.ui_renderer = Some(renderer);
+        self.renderer = Some(renderer);
     }
 
     fn window_event(
@@ -153,32 +134,24 @@ impl ApplicationHandler for App {
         event: winit::event::WindowEvent,
     ) {
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => {
-                if let Some(pixels) = &mut self.pixels {
-                    pixels.resize_surface(size.width, size.height).unwrap();
-                    pixels.resize_buffer(size.width, size.height).unwrap();
-                }
+            WindowEvent::CloseRequested => {
+                self.renderer = None;
+                event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                let bg_colour: Colour = Colour::new(0, 0, 0, 255);
+                for chunk in self.buffer.chunks_exact_mut(4) {
+                    chunk[0] = 0;
+                    chunk[1] = 0;
+                    chunk[2] = 0;
+                    chunk[3] = 255;
+                }
 
                 self.grid.update(DIFFUSION, self.delta);
+                self.grid.draw(&mut self.buffer);
 
-                let window = self.window.as_ref().unwrap();
-                window.scale_factor();
-                let raw_input = self.ui_state.as_mut().unwrap().take_egui_input(window);
-
-                if let Some(pixels) = &mut self.pixels {
-                    let frame = pixels.frame_mut();
-                    for pixel in frame.chunks_exact_mut(4) {
-                        pixel[0] = bg_colour.red;
-                        pixel[1] = bg_colour.green;
-                        pixel[2] = bg_colour.blue;
-                        pixel[3] = bg_colour.alpha;
-                    }
-                    self.grid.draw(frame);
-                    pixels.render().unwrap();
+                if let Some(renderer) = &mut self.renderer {
+                    renderer.upload_texture(&self.buffer);
+                    renderer.render();
                 }
 
                 if let Some(window) = &self.window {
