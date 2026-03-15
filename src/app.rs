@@ -136,7 +136,15 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
+                for chunk in self.buffer.chunks_exact_mut(4) {
+                    chunk[0] = 0;
+                    chunk[1] = 0;
+                    chunk[2] = 0;
+                    chunk[3] = 255;
+                }
+
                 if let Some(renderer) = &mut self.renderer {
+                    renderer.upload_texture(&self.buffer);
                     renderer.render();
                 }
 
