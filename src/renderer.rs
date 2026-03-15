@@ -11,6 +11,10 @@ pub struct Renderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+
+    texture: wgpu::Texture,
+    texture_view: wgpu::TextureView,
+    sampler: wgpu::Sampler,
 }
 
 impl Renderer {
@@ -45,6 +49,26 @@ impl Renderer {
         };
         surface.configure(&device, &config);
 
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Simulation texture"),
+            size: wgpu::Extent3d {
+                width: sim_width,
+                height: sim_height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+
+        let texture_view = texture.create_view(&Default::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+
         Self {
             window,
             sim_width,
@@ -53,6 +77,9 @@ impl Renderer {
             device,
             queue,
             config,
+            texture,
+            texture_view,
+            sampler,
         }
     }
 
