@@ -1,9 +1,5 @@
 use std::sync::Arc;
 
-use egui::Context;
-use egui_wgpu::Renderer;
-use egui_winit::State;
-use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalPosition,
@@ -12,7 +8,7 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-use crate::grid::Grid;
+use crate::{grid::Grid, renderer::Renderer};
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
@@ -30,23 +26,9 @@ enum DrawMode {
 
 pub struct App {
     window: Option<Arc<Window>>,
-
-    surface: Option<wgpu::Surface<'static>>,
-    device: Option<wgpu::Device>,
-    queue: Option<wgpu::Queue>,
-    config: Option<wgpu::SurfaceConfiguration>,
-
-    texture: Option<wgpu::Texture>,
-    texture_view: Option<wgpu::TextureView>,
-    sampler: Option<wgpu::Sampler>,
-    render_pipeline: Option<wgpu::RenderPipeline>,
-    buffer: Vec<u8>,
-
-    ui_context: Context,
-    ui_state: Option<State>,
-    ui_renderer: Option<Renderer>,
-
     delta: f64,
+    buffer: Vec<u8>,
+    renderer: Option<Renderer>,
     grid: Grid,
 
     draw_mode: DrawMode,
@@ -61,23 +43,9 @@ impl App {
     pub fn new() -> Self {
         Self {
             window: None,
-
-            surface: None,
-            device: None,
-            queue: None,
-            config: None,
-
-            texture: None,
-            texture_view: None,
-            sampler: None,
-            render_pipeline: None,
-            buffer: vec![0u8; 4 * WIDTH * HEIGHT],
-
-            ui_context: Context::default(),
-            ui_state: None,
-            ui_renderer: None,
-
             delta: 1.0,
+            buffer: vec![0u8; 4 * WIDTH * HEIGHT],
+            renderer: None,
             grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
 
             draw_mode: DrawMode::Gas,
@@ -150,62 +118,6 @@ impl ApplicationHandler for App {
             .unwrap();
         let window = Arc::new(window);
         self.window = Some(window.clone());
-
-        let instance = wgpu::Instance::default();
-        let surface = instance.create_surface(window.clone()).unwrap();
-        self.surface = Some(surface);
-
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            compatible_surface: Some(self.surface.as_ref().unwrap()),
-            force_fallback_adapter: false,
-        }))
-        .unwrap();
-        let (device, queue) =
-            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).unwrap();
-
-        self.device = Some(device.clone());
-        self.queue = Some(queue);
-
-        let surface_capabilities = self.surface.as_ref().unwrap().get_capabilities(&adapter);
-        let surface_format = surface_capabilities.formats[0];
-        let surface_config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: WIDTH as u32,
-            height: HEIGHT as u32,
-            present_mode: wgpu::PresentMode::Fifo,
-            alpha_mode: surface_capabilities.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-        };
-        self.surface
-            .as_ref()
-            .unwrap()
-            .configure(&device, &surface_config);
-        self.config = Some(surface_config);
-
-        let texture = self
-            .device
-            .as_ref()
-            .unwrap()
-            .create_texture(&wgpu::TextureDescriptor {
-                label: Some("Test texture"),
-                size: wgpu::Extent3d {
-                    width: WIDTH as u32,
-                    height: HEIGHT as u32,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8Unorm,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            });
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        self.texture = Some(texture);
-        self.texture_view = Some(texture_view);
     }
 
     fn window_event(
@@ -217,92 +129,6 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
-                let mut data = vec![0u8; 800 * 600 * 4];
-
-                for i in (0..data.len()).step_by(4) {
-                    data[i] = 255;
-                    data[i + 1] = 0;
-                    data[i + 2] = 0;
-                    data[i + 3] = 255;
-                }
-
-                let frame = match self.surface.as_ref().unwrap().get_current_texture() {
-                    Ok(frame) => frame,
-                    Err(wgpu::SurfaceError::Lost) => {
-                        let config = self.config.as_ref().unwrap();
-                        self.surface
-                            .as_ref()
-                            .unwrap()
-                            .configure(self.device.as_ref().unwrap(), config);
-                        return;
-                    }
-                    Err(wgpu::SurfaceError::Outdated) => {
-                        return;
-                    }
-                    Err(wgpu::SurfaceError::Timeout) => {
-                        return;
-                    }
-                    Err(wgpu::SurfaceError::OutOfMemory) => {
-                        panic!("Out of GPU memory");
-                    }
-                    Err(wgpu::SurfaceError::Other) => {
-                        panic!("Other error!");
-                    }
-                };
-                let view = frame.texture.create_view(&Default::default());
-                let mut encoder = self.device.as_ref().unwrap().create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor {
-                        label: Some("Render Encoder"),
-                    },
-                );
-
-                self.queue.as_ref().unwrap().write_texture(
-                    wgpu::TexelCopyTextureInfo {
-                        texture: &self.texture.as_ref().unwrap(),
-                        mip_level: 0,
-                        origin: wgpu::Origin3d::ZERO,
-                        aspect: wgpu::TextureAspect::All,
-                    },
-                    &self.buffer,
-                    wgpu::TexelCopyBufferLayout {
-                        offset: 0,
-                        bytes_per_row: Some((4 * WIDTH / CELL_SIZE) as u32),
-                        rows_per_image: Some((4 * HEIGHT / CELL_SIZE) as u32),
-                    },
-                    wgpu::Extent3d {
-                        width: (4 * WIDTH / CELL_SIZE) as u32,
-                        height: (4 * HEIGHT / CELL_SIZE) as u32,
-                        depth_or_array_layers: 1,
-                    },
-                );
-
-                {
-                    let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("Render Pass"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            resolve_target: None,
-                            depth_slice: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.0,
-                                    g: 0.0,
-                                    b: 0.0,
-                                    a: 1.0,
-                                }),
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                    });
-                }
-
-                self.queue.as_ref().unwrap().submit(Some(encoder.finish()));
-
-                frame.present();
-
                 if let Some(window) = &self.window {
                     window.request_redraw();
                 }

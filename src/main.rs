@@ -2,6 +2,7 @@ use winit::event_loop::EventLoop;
 
 mod app;
 mod grid;
+mod renderer;
 
 fn main() {
     let event_loop = EventLoop::new().unwrap();
