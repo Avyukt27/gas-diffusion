@@ -1,20 +1,23 @@
+use std::sync::Arc;
+
 use winit::window::Window;
 
-pub struct Renderer<'a> {
+pub struct Renderer {
+    window: Arc<Window>,
     sim_width: u32,
     sim_height: u32,
 
-    surface: wgpu::Surface<'a>,
+    surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
 }
 
-impl<'a> Renderer<'a> {
-    pub async fn new(window: &'a Window, sim_width: u32, sim_height: u32) -> Self {
+impl Renderer {
+    pub async fn new(window: Arc<Window>, sim_width: u32, sim_height: u32) -> Self {
         let instance = wgpu::Instance::default();
 
-        let surface = instance.create_surface(window).unwrap();
+        let surface = instance.create_surface(window.clone()).unwrap();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -43,6 +46,7 @@ impl<'a> Renderer<'a> {
         surface.configure(&device, &config);
 
         Self {
+            window,
             sim_width,
             sim_height,
             surface,
@@ -50,5 +54,45 @@ impl<'a> Renderer<'a> {
             queue,
             config,
         }
+    }
+
+    pub fn render(&mut self) {
+        let frame = self
+            .surface
+            .get_current_texture()
+            .expect("Failed to acquire next swap chain texture");
+        let view = frame.texture.create_view(&Default::default());
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render encoder"),
+            });
+
+        {
+            let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+        }
+
+        self.queue.submit(Some(encoder.finish()));
+        frame.present();
     }
 }

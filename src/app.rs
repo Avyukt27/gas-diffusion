@@ -117,7 +117,13 @@ impl ApplicationHandler for App {
             )
             .unwrap();
         let window = Arc::new(window);
-        self.window = Some(window.clone());
+        let renderer = pollster::block_on(Renderer::new(
+            window.clone(),
+            (WIDTH / CELL_SIZE) as u32,
+            (HEIGHT / CELL_SIZE) as u32,
+        ));
+        self.window = Some(window);
+        self.renderer = Some(renderer);
     }
 
     fn window_event(
@@ -129,6 +135,10 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
+                if let Some(renderer) = &mut self.renderer {
+                    renderer.render();
+                }
+
                 if let Some(window) = &self.window {
                     window.request_redraw();
                 }
