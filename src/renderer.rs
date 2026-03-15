@@ -3,7 +3,6 @@ use std::sync::Arc;
 use winit::window::Window;
 
 pub struct Renderer {
-    window: Arc<Window>,
     width: u32,
     height: u32,
     cell_size: u32,
@@ -11,11 +10,11 @@ pub struct Renderer {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
+    _config: wgpu::SurfaceConfiguration,
 
     texture: wgpu::Texture,
-    texture_view: wgpu::TextureView,
-    sampler: wgpu::Sampler,
+    _texture_view: wgpu::TextureView,
+    _sampler: wgpu::Sampler,
 
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
@@ -144,17 +143,16 @@ impl Renderer {
         });
 
         Self {
-            window,
             width,
             height,
             cell_size,
             surface,
             device,
             queue,
-            config,
+            _config: config,
             texture,
-            texture_view,
-            sampler,
+            _texture_view: texture_view,
+            _sampler: sampler,
             pipeline,
             bind_group,
         }
