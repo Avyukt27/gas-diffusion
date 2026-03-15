@@ -16,7 +16,7 @@ pub struct Renderer {
     pub config: wgpu::SurfaceConfiguration,
 
     texture: wgpu::Texture,
-    texture_view: wgpu::TextureView,
+    _texture_view: wgpu::TextureView,
     _sampler: wgpu::Sampler,
 
     pipeline: wgpu::RenderPipeline,
@@ -155,7 +155,7 @@ impl Renderer {
             queue,
             config,
             texture,
-            texture_view,
+            _texture_view: texture_view,
             _sampler: sampler,
             pipeline,
             bind_group,
@@ -175,10 +175,6 @@ impl Renderer {
                 label: Some("Render encoder"),
             });
 
-        if let Some(gui) = hud {
-            gui.render(&self.window, &self.device, &self.queue, &mut encoder, &view);
-        }
-
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -188,9 +184,9 @@ impl Renderer {
                     depth_slice: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
+                            r: 1.0,
+                            g: 1.0,
+                            b: 1.0,
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -204,6 +200,16 @@ impl Renderer {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &self.bind_group, &[]);
             pass.draw(0..6, 0..1);
+        }
+
+        if let Some(gui) = hud {
+            gui.render(
+                self.window.as_ref(),
+                &self.device,
+                &self.queue,
+                &mut encoder,
+                &view,
+            );
         }
 
         self.queue.submit(Some(encoder.finish()));

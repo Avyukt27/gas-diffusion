@@ -24,7 +24,10 @@ impl Hud {
         let renderer = egui_wgpu::Renderer::new(
             device,
             texture_format,
-            egui_wgpu::RendererOptions::default(),
+            egui_wgpu::RendererOptions {
+                dithering: false,
+                ..Default::default()
+            },
         );
 
         Self {
@@ -48,14 +51,18 @@ impl Hud {
     ) {
         let screen_descriptor = egui_wgpu::ScreenDescriptor {
             size_in_pixels: [window.inner_size().width, window.inner_size().height],
-            pixels_per_point: window.scale_factor() as f32,
+            pixels_per_point: 1.0,
         };
 
         let input = self.state.take_egui_input(window);
         let full_output = self.context.run(input, |ctx| {
-            egui::Window::new("Controls").show(ctx, |ui| {
-                ui.label("test");
-            });
+            egui::Window::new("Controls")
+                .collapsible(false)
+                .resizable(false)
+                .fixed_pos(egui::pos2(10.0, 10.0))
+                .show(ctx, |ui| {
+                    ui.label("test");
+                });
         });
         self.state
             .handle_platform_output(window, full_output.platform_output);

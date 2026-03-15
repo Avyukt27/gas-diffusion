@@ -45,7 +45,7 @@ impl App {
         Self {
             window: None,
             delta: 1.0,
-            buffer: vec![0u8; 4 * (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
+            buffer: vec![255u8; 4 * (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
             renderer: None,
             grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
             hud: None,
@@ -137,6 +137,12 @@ impl ApplicationHandler for App {
         _window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
+        if let Some(hud) = &mut self.hud {
+            if let Some(window) = &self.window {
+                hud.handle_event(window, &event);
+            }
+        }
+
         match event {
             WindowEvent::CloseRequested => {
                 self.renderer = None;
@@ -144,15 +150,8 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                for chunk in self.buffer.chunks_exact_mut(4) {
-                    chunk[0] = 0;
-                    chunk[1] = 0;
-                    chunk[2] = 0;
-                    chunk[3] = 255;
-                }
-
                 self.grid.update(DIFFUSION, self.delta);
-                self.grid.draw(&mut self.buffer);
+                // self.grid.draw(&mut self.buffer);
 
                 if let Some(renderer) = &mut self.renderer {
                     renderer.upload_texture(&self.buffer);
