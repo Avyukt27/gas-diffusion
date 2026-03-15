@@ -4,8 +4,9 @@ use winit::window::Window;
 
 pub struct Renderer {
     window: Arc<Window>,
-    sim_width: u32,
-    sim_height: u32,
+    width: u32,
+    height: u32,
+    cell_size: u32,
 
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -15,10 +16,13 @@ pub struct Renderer {
     texture: wgpu::Texture,
     texture_view: wgpu::TextureView,
     sampler: wgpu::Sampler,
+
+    pipeline: wgpu::RenderPipeline,
+    bind_group: wgpu::BindGroup,
 }
 
 impl Renderer {
-    pub async fn new(window: Arc<Window>, sim_width: u32, sim_height: u32) -> Self {
+    pub async fn new(window: Arc<Window>, width: u32, height: u32, cell_size: u32) -> Self {
         let instance = wgpu::Instance::default();
 
         let surface = instance.create_surface(window.clone()).unwrap();
@@ -52,8 +56,8 @@ impl Renderer {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Simulation texture"),
             size: wgpu::Extent3d {
-                width: sim_width,
-                height: sim_height,
+                width,
+                height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -71,8 +75,9 @@ impl Renderer {
 
         Self {
             window,
-            sim_width,
-            sim_height,
+            width,
+            height,
+            cell_size,
             surface,
             device,
             queue,
@@ -121,5 +126,27 @@ impl Renderer {
 
         self.queue.submit(Some(encoder.finish()));
         frame.present();
+    }
+
+    pub fn upload_texture(&self, buffer: &[u8]) {
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            buffer,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * self.width / self.cell_size),
+                rows_per_image: Some(self.height / self.cell_size),
+            },
+            wgpu::Extent3d {
+                width: self.width / self.cell_size,
+                height: self.height / self.cell_size,
+                depth_or_array_layers: 1,
+            },
+        );
     }
 }

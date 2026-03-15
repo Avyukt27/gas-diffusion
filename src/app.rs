@@ -119,8 +119,9 @@ impl ApplicationHandler for App {
         let window = Arc::new(window);
         let renderer = pollster::block_on(Renderer::new(
             window.clone(),
-            (WIDTH / CELL_SIZE) as u32,
-            (HEIGHT / CELL_SIZE) as u32,
+            WIDTH as u32,
+            HEIGHT as u32,
+            CELL_SIZE as u32,
         ));
         self.window = Some(window);
         self.renderer = Some(renderer);
