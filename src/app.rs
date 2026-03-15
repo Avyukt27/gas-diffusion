@@ -8,7 +8,7 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-use crate::{grid::Grid, renderer::Renderer};
+use crate::{grid::Grid, hud::Hud, renderer::Renderer};
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
@@ -30,6 +30,7 @@ pub struct App {
     buffer: Vec<u8>,
     renderer: Option<Renderer>,
     grid: Grid,
+    hud: Option<Hud>,
 
     draw_mode: DrawMode,
     draw_size: usize,
@@ -47,6 +48,7 @@ impl App {
             buffer: vec![0u8; 4 * (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
             renderer: None,
             grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
+            hud: None,
 
             draw_mode: DrawMode::Gas,
             draw_size: 1,
@@ -123,8 +125,10 @@ impl ApplicationHandler for App {
             HEIGHT as u32,
             CELL_SIZE as u32,
         ));
+        let hud = Hud::new(&window, &renderer.device, renderer.config.format);
         self.window = Some(window);
         self.renderer = Some(renderer);
+        self.hud = Some(hud);
     }
 
     fn window_event(
@@ -136,6 +140,7 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => {
                 self.renderer = None;
+                self.hud = None;
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
@@ -151,7 +156,7 @@ impl ApplicationHandler for App {
 
                 if let Some(renderer) = &mut self.renderer {
                     renderer.upload_texture(&self.buffer);
-                    renderer.render();
+                    renderer.render(&mut self.hud);
                 }
 
                 if let Some(window) = &self.window {

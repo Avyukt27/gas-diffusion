@@ -2,18 +2,21 @@ use std::sync::Arc;
 
 use winit::window::Window;
 
+use crate::hud::Hud;
+
 pub struct Renderer {
+    window: Arc<Window>,
     width: u32,
     height: u32,
     cell_size: u32,
 
-    surface: wgpu::Surface<'static>,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    _config: wgpu::SurfaceConfiguration,
+    pub surface: wgpu::Surface<'static>,
+    pub device: wgpu::Device,
+    pub queue: wgpu::Queue,
+    pub config: wgpu::SurfaceConfiguration,
 
     texture: wgpu::Texture,
-    _texture_view: wgpu::TextureView,
+    texture_view: wgpu::TextureView,
     _sampler: wgpu::Sampler,
 
     pipeline: wgpu::RenderPipeline,
@@ -143,22 +146,23 @@ impl Renderer {
         });
 
         Self {
+            window,
             width,
             height,
             cell_size,
             surface,
             device,
             queue,
-            _config: config,
+            config,
             texture,
-            _texture_view: texture_view,
+            texture_view,
             _sampler: sampler,
             pipeline,
             bind_group,
         }
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self, hud: &mut Option<Hud>) {
         let frame = self
             .surface
             .get_current_texture()
@@ -170,6 +174,10 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render encoder"),
             });
+
+        if let Some(gui) = hud {
+            gui.render(&self.window, &self.device, &self.queue, &mut encoder, &view);
+        }
 
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
