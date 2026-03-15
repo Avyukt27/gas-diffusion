@@ -44,7 +44,7 @@ impl App {
         Self {
             window: None,
             delta: 1.0,
-            buffer: vec![0u8; 4 * WIDTH * HEIGHT],
+            buffer: vec![0u8; 4 * (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
             renderer: None,
             grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
 
@@ -66,16 +66,16 @@ impl App {
         width: usize,
         height: usize,
     ) {
-        if start_x >= self.grid.grid_width || start_y >= self.grid.grid_height {
+        if start_x >= self.grid.width || start_y >= self.grid.height {
             return;
         }
 
-        let max_x = (start_x + width).min(self.grid.grid_width);
-        let max_y = (start_y + height).min(self.grid.grid_height);
+        let max_x = (start_x + width).min(self.grid.width);
+        let max_y = (start_y + height).min(self.grid.height);
 
         for y in start_y..max_y {
             for x in start_x..max_x {
-                let idx = y * self.grid.grid_width + x;
+                let idx = y * self.grid.width + x;
                 match self.draw_mode {
                     DrawMode::Gas => {
                         self.grid.concentrations[idx] = self.draw_intensity.clamp(0.0, 1.0);
@@ -134,7 +134,10 @@ impl ApplicationHandler for App {
         event: winit::event::WindowEvent,
     ) {
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::CloseRequested => {
+                self.renderer = None;
+                event_loop.exit();
+            }
             WindowEvent::RedrawRequested => {
                 for chunk in self.buffer.chunks_exact_mut(4) {
                     chunk[0] = 0;
@@ -142,6 +145,9 @@ impl ApplicationHandler for App {
                     chunk[2] = 0;
                     chunk[3] = 255;
                 }
+
+                self.grid.update(DIFFUSION, self.delta);
+                self.grid.draw(&mut self.buffer);
 
                 if let Some(renderer) = &mut self.renderer {
                     renderer.upload_texture(&self.buffer);
