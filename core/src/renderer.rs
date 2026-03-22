@@ -11,7 +11,7 @@ pub struct Renderer {
     pub surface: wgpu::Surface<'static>,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    pub config: wgpu::SurfaceConfiguration,
+    config: wgpu::SurfaceConfiguration,
 
     texture: wgpu::Texture,
     _texture_view: wgpu::TextureView,

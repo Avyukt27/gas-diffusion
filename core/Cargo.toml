@@ -1,8 +1,13 @@
 [package]
 name = "core"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2024"
 
 [dependencies]
 wgpu = "27.0.1"
 winit = "0.30.13"
+pollster = "0.4.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"

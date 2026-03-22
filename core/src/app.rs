@@ -117,12 +117,23 @@ impl ApplicationHandler for App {
             )
             .unwrap();
         let window = Arc::new(window);
+
+        #[cfg(not(target_arch = "wasm32"))]
         let renderer = pollster::block_on(Renderer::new(
-            window.clone(),
+            window,
             WIDTH as u32,
             HEIGHT as u32,
             CELL_SIZE as u32,
         ));
+
+        #[cfg(target_arch = "wasm32")]
+        let renderer = wasm_bindgen_futures::spawn_local(Renderer::new(
+            window,
+            WIDTH as u32,
+            HEIGHT as u32,
+            CELL_SIZE as u32,
+        ));
+
         self.window = Some(window);
         self.renderer = Some(renderer);
     }

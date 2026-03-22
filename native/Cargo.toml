@@ -1,7 +1,9 @@
 [package]
 name = "native"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2024"
 
 [dependencies]
+core = { path = "../core" }
+winit = "0.30.13"
 pollster = "0.4.0"
