@@ -10,7 +10,7 @@ pub struct Renderer {
     pub surface: wgpu::Surface<'static>,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
+    _config: wgpu::SurfaceConfiguration,
 
     texture: wgpu::Texture,
     _texture_view: wgpu::TextureView,
@@ -149,7 +149,7 @@ impl Renderer {
             surface,
             device,
             queue,
-            config,
+            _config: config,
             texture,
             _texture_view: texture_view,
             _sampler: sampler,
