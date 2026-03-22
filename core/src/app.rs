@@ -120,7 +120,7 @@ impl ApplicationHandler for App {
 
         #[cfg(not(target_arch = "wasm32"))]
         let renderer = pollster::block_on(Renderer::new(
-            window,
+            &window,
             WIDTH as u32,
             HEIGHT as u32,
             CELL_SIZE as u32,
@@ -128,7 +128,7 @@ impl ApplicationHandler for App {
 
         #[cfg(target_arch = "wasm32")]
         let renderer = wasm_bindgen_futures::spawn_local(Renderer::new(
-            window,
+            &window,
             WIDTH as u32,
             HEIGHT as u32,
             CELL_SIZE as u32,

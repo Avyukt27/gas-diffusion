@@ -3,7 +3,6 @@ use std::sync::Arc;
 use winit::window::Window;
 
 pub struct Renderer {
-    window: Arc<Window>,
     width: u32,
     height: u32,
     cell_size: u32,
@@ -22,7 +21,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn new(window: Arc<Window>, width: u32, height: u32, cell_size: u32) -> Self {
+    pub async fn new(window: &Arc<Window>, width: u32, height: u32, cell_size: u32) -> Self {
         let instance = wgpu::Instance::default();
 
         let surface = instance.create_surface(window.clone()).unwrap();
@@ -144,7 +143,6 @@ impl Renderer {
         });
 
         Self {
-            window,
             width,
             height,
             cell_size,
