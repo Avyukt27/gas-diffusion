@@ -140,10 +140,11 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 self.grid.update(DIFFUSION, self.delta);
-                // self.grid.draw(&mut self.buffer);
+                self.grid.draw(&mut self.buffer);
 
                 if let Some(renderer) = &mut self.renderer {
                     renderer.upload_texture(&self.buffer);
+                    renderer.render();
                 }
 
                 if let Some(window) = &self.window {

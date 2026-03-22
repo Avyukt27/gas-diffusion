@@ -160,7 +160,7 @@ impl Renderer {
         }
     }
 
-    pub fn render(&mut self, hud: &mut Option<Hud>) {
+    pub fn render(&mut self) {
         let frame = self
             .surface
             .get_current_texture()
