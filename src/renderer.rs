@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use winit::window::Window;
 
-use crate::hud::Hud;
-
 pub struct Renderer {
     window: Arc<Window>,
     width: u32,
@@ -197,19 +195,9 @@ impl Renderer {
                 occlusion_query_set: None,
             });
 
-            // pass.set_pipeline(&self.pipeline);
-            // pass.set_bind_group(0, &self.bind_group, &[]);
-            // pass.draw(0..6, 0..1);
-        }
-
-        if let Some(gui) = hud {
-            gui.render(
-                self.window.as_ref(),
-                &self.device,
-                &self.queue,
-                &mut encoder,
-                &view,
-            );
+            pass.set_pipeline(&self.pipeline);
+            pass.set_bind_group(0, &self.bind_group, &[]);
+            pass.draw(0..6, 0..1);
         }
 
         self.queue.submit(Some(encoder.finish()));
