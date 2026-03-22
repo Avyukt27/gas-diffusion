@@ -267,6 +267,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "core"
+version = "2.0.0"
+dependencies = [
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -347,12 +355,7 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "diffusion"
-version = "0.1.0"
-dependencies = [
- "pollster",
- "wgpu",
- "winit",
-]
+version = "2.0.0"
 
 [[package]]
 name = "dispatch"
@@ -821,6 +824,13 @@ dependencies = [
  "spirv",
  "thiserror 2.0.18",
  "unicode-ident",
+]
+
+[[package]]
+name = "native"
+version = "2.0.0"
+dependencies = [
+ "pollster",
 ]
 
 [[package]]
@@ -1869,6 +1879,10 @@ dependencies = [
  "once_cell",
  "pkg-config",
 ]
+
+[[package]]
+name = "web"
+version = "0.1.0"
 
 [[package]]
 name = "web-sys"
