@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use pixels::{Pixels, SurfaceTexture};
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalPosition,
@@ -9,12 +8,12 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-use crate::{colour::Colour, grid::Grid};
+use crate::{grid::Grid, renderer::Renderer};
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
+const CELL_SIZE: usize = 10;
 const DIFFUSION: f64 = 2.0;
-const DELTA: f64 = 1.0;
 
 #[derive(PartialEq, Eq, Debug)]
 enum DrawMode {
@@ -27,8 +26,11 @@ enum DrawMode {
 
 pub struct App {
     window: Option<Arc<Window>>,
-    pixels: Option<Pixels<'static>>,
+    delta: f64,
+    buffer: Vec<u8>,
+    renderer: Option<Renderer>,
     grid: Grid,
+
     draw_mode: DrawMode,
     draw_size: usize,
     draw_intensity: f64,
@@ -41,8 +43,11 @@ impl App {
     pub fn new() -> Self {
         Self {
             window: None,
-            pixels: None,
-            grid: Grid::new(WIDTH, HEIGHT, 10),
+            delta: 1.0,
+            buffer: vec![0u8; 4 * (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
+            renderer: None,
+            grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
+
             draw_mode: DrawMode::Gas,
             draw_size: 1,
             draw_intensity: 1.0,
@@ -61,16 +66,16 @@ impl App {
         width: usize,
         height: usize,
     ) {
-        if start_x >= self.grid.grid_width || start_y >= self.grid.grid_height {
+        if start_x >= self.grid.width || start_y >= self.grid.height {
             return;
         }
 
-        let max_x = (start_x + width).min(self.grid.grid_width);
-        let max_y = (start_y + height).min(self.grid.grid_height);
+        let max_x = (start_x + width).min(self.grid.width);
+        let max_y = (start_y + height).min(self.grid.height);
 
         for y in start_y..max_y {
             for x in start_x..max_x {
-                let idx = y * self.grid.grid_width + x;
+                let idx = y * self.grid.width + x;
                 match self.draw_mode {
                     DrawMode::Gas => {
                         self.grid.concentrations[idx] = self.draw_intensity.clamp(0.0, 1.0);
@@ -88,7 +93,7 @@ impl App {
                         let dy = start_y as f64 - prev_cell_y as f64;
                         let strength = 5.0;
                         let vel = (dx * strength, dy * strength);
-                        let max_vel = self.grid.cell_size as f64 / DELTA * 0.5;
+                        let max_vel = self.grid.cell_size as f64 / self.delta * 0.5;
 
                         self.grid.advections[idx].0 =
                             (self.grid.advections[idx].0 + vel.0).clamp(-max_vel, max_vel);
@@ -111,14 +116,15 @@ impl ApplicationHandler for App {
                     .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64)),
             )
             .unwrap();
-
         let window = Arc::new(window);
-
-        let surface = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, window.clone());
-        let pixels = Pixels::new(WIDTH as u32, HEIGHT as u32, surface).unwrap();
-
-        self.window = Some(window.clone());
-        self.pixels = Some(pixels);
+        let renderer = pollster::block_on(Renderer::new(
+            window.clone(),
+            WIDTH as u32,
+            HEIGHT as u32,
+            CELL_SIZE as u32,
+        ));
+        self.window = Some(window);
+        self.renderer = Some(renderer);
     }
 
     fn window_event(
@@ -128,28 +134,17 @@ impl ApplicationHandler for App {
         event: winit::event::WindowEvent,
     ) {
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => {
-                if let Some(pixels) = &mut self.pixels {
-                    pixels.resize_surface(size.width, size.height).unwrap();
-                    pixels.resize_buffer(size.width, size.height).unwrap();
-                }
+            WindowEvent::CloseRequested => {
+                self.renderer = None;
+                event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                let bg_colour: Colour = Colour::new(0, 0, 0, 255);
+                self.grid.update(DIFFUSION, self.delta);
+                self.grid.draw(&mut self.buffer);
 
-                self.grid.update(DIFFUSION, DELTA);
-
-                if let Some(pixels) = &mut self.pixels {
-                    let frame = pixels.frame_mut();
-                    for pixel in frame.chunks_exact_mut(4) {
-                        pixel[0] = bg_colour.red;
-                        pixel[1] = bg_colour.green;
-                        pixel[2] = bg_colour.blue;
-                        pixel[3] = bg_colour.alpha;
-                    }
-                    self.grid.draw(frame);
-                    pixels.render().unwrap();
+                if let Some(renderer) = &mut self.renderer {
+                    renderer.upload_texture(&self.buffer);
+                    renderer.render();
                 }
 
                 if let Some(window) = &self.window {
@@ -176,6 +171,13 @@ impl ApplicationHandler for App {
                         }
                         Key::Named(NamedKey::ArrowDown) => {
                             self.draw_intensity = (self.draw_intensity - 0.25).clamp(0.0, 1.0)
+                        }
+                        Key::Named(NamedKey::Enter) => {
+                            if self.delta != 0.0 {
+                                self.delta = 0.0;
+                            } else {
+                                self.delta = 1.0;
+                            }
                         }
                         Key::Character(ref c) if c == "c" => {
                             self.grid.concentrations.fill(0.0);
