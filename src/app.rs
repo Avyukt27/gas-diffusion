@@ -45,7 +45,7 @@ impl App {
         Self {
             window: None,
             delta: 1.0,
-            buffer: vec![255u8; 4 * (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
+            buffer: vec![0u8; 4 * (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
             renderer: None,
             grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
             hud: None,
