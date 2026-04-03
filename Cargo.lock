@@ -282,7 +282,7 @@ version = "2.1.0"
 dependencies = [
  "pollster",
  "wasm-bindgen",
- "wasm-bindgen-futures",
+ "web-sys",
  "wgpu",
  "winit",
 ]

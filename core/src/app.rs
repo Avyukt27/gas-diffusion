@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+#[cfg(target_arch = "wasm32")]
+use winit::platform::web::WindowAttributesExtWebSys;
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalPosition,
@@ -109,25 +111,28 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let window = event_loop
-            .create_window(
-                WindowAttributes::default()
-                    .with_title("Diffusion Simulation Window")
-                    .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64)),
-            )
-            .unwrap();
-        let window = Arc::new(window);
-
-        #[cfg(not(target_arch = "wasm32"))]
-        let renderer = pollster::block_on(Renderer::new(
-            &window,
-            WIDTH as u32,
-            HEIGHT as u32,
-            CELL_SIZE as u32,
-        ));
+        let attrs = WindowAttributes::default()
+            .with_title("Diffusion Simulation Window")
+            .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64));
 
         #[cfg(target_arch = "wasm32")]
-        let renderer = wasm_bindgen_futures::spawn_local(Renderer::new(
+        let attrs = {
+            use wasm_bindgen::JsCast;
+            let canvas = web_sys::window()
+                .unwrap()
+                .document()
+                .unwrap()
+                .get_element_by_id("canvas")
+                .unwrap()
+                .dyn_into::<web_sys::HtmlCanvasElement>()
+                .unwrap();
+            attrs.with_canvas(Some(canvas))
+        };
+
+        let window = event_loop.create_window(attrs).unwrap();
+        let window = Arc::new(window);
+
+        let renderer = pollster::block_on(Renderer::new(
             &window,
             WIDTH as u32,
             HEIGHT as u32,
