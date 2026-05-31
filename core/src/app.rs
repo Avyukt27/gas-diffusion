@@ -137,12 +137,7 @@ impl ApplicationHandler for App {
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let renderer = pollster::block_on(Renderer::new(
-                &window,
-                WIDTH as u32,
-                HEIGHT as u32,
-                CELL_SIZE as u32,
-            ));
+            let renderer = pollster::block_on(Renderer::new(&window, CELL_SIZE as u32));
 
             *renderer_storage.lock().unwrap() = Some(renderer);
         }
@@ -150,8 +145,7 @@ impl ApplicationHandler for App {
         #[cfg(target_arch = "wasm32")]
         {
             wasm_bindgen_futures::spawn_local(async move {
-                let renderer =
-                    Renderer::new(&window, WIDTH as u32, HEIGHT as u32, CELL_SIZE as u32).await;
+                let renderer = Renderer::new(&window, CELL_SIZE as u32).await;
 
                 *renderer_storage.lock().unwrap() = Some(renderer);
             })

@@ -21,11 +21,8 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn new(window: &Arc<Window>, width: u32, height: u32, cell_size: u32) -> Self {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::GL | wgpu::Backends::BROWSER_WEBGPU,
-            ..Default::default()
-        });
+    pub async fn new(window: &Arc<Window>, cell_size: u32) -> Self {
+        let instance = wgpu::Instance::default();
 
         let surface = instance.create_surface(window.clone()).unwrap();
         let adapter = instance
@@ -52,11 +49,15 @@ impl Renderer {
 
         let size = window.inner_size();
         let capabilities = surface.get_capabilities(&adapter);
+
+        let width = if size.width == 0 { 800 } else { size.width };
+        let height = if size.height == 0 { 600 } else { size.height };
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: capabilities.formats[0],
-            width: size.width,
-            height: size.height,
+            width: width,
+            height: height,
             present_mode: capabilities.present_modes[0],
             alpha_mode: capabilities.alpha_modes[0],
             view_formats: vec![],
