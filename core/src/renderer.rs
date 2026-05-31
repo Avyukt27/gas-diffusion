@@ -62,7 +62,7 @@ impl Renderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: wgpu::TextureFormat::R32Float,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_DST
                 | wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -70,7 +70,16 @@ impl Renderer {
         });
 
         let texture_view = texture.create_view(&Default::default());
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Simulation Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Bind group layout"),
@@ -79,7 +88,7 @@ impl Renderer {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
                         view_dimension: wgpu::TextureViewDimension::D2,
                         multisampled: false,
                     },
@@ -88,7 +97,7 @@ impl Renderer {
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
                     count: None,
                 },
             ],
@@ -202,25 +211,67 @@ impl Renderer {
         frame.present();
     }
 
-    pub fn upload_texture(&self, buffer: &[u8]) {
-        self.queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &self.texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            buffer,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * (self.width / self.cell_size)),
-                rows_per_image: Some(self.height / self.cell_size),
-            },
-            wgpu::Extent3d {
-                width: self.width / self.cell_size,
-                height: self.height / self.cell_size,
-                depth_or_array_layers: 1,
-            },
-        );
+    pub fn upload_texture(&self, buffer: &[f32]) {
+        let grid_width = self.width / self.cell_size;
+        let grid_height = self.height / self.cell_size;
+
+        let unpadded_bytes_per_row = grid_width * 4;
+        let padding = (256 - (unpadded_bytes_per_row % 256)) % 256;
+        let padded_bytes_per_row = unpadded_bytes_per_row + padding;
+
+        if padding == 0 {
+            self.queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &self.texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                bytemuck::cast_slice(buffer),
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(unpadded_bytes_per_row),
+                    rows_per_image: Some(grid_height),
+                },
+                wgpu::Extent3d {
+                    width: grid_width,
+                    height: grid_height,
+                    depth_or_array_layers: 1,
+                },
+            );
+        } else {
+            // Create an aligned copy buffer for the GPU
+            let f32_per_row = padded_bytes_per_row / 4;
+            let mut aligned_buffer = vec![0.0f32; f32_per_row as usize * grid_height as usize];
+
+            for y in 0..grid_height as usize {
+                let src_start = y * grid_width as usize;
+                let src_end = src_start + grid_width as usize;
+                let dest_start = y * f32_per_row as usize;
+
+                aligned_buffer[dest_start..dest_start + grid_width as usize]
+                    .copy_from_slice(&buffer[src_start..src_end]);
+            }
+
+            self.queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &self.texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                bytemuck::cast_slice(&aligned_buffer),
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(padded_bytes_per_row),
+                    rows_per_image: Some(grid_height),
+                },
+                wgpu::Extent3d {
+                    width: grid_width,
+                    height: grid_height,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
     }
 }

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowAttributesExtWebSys;
@@ -29,8 +29,8 @@ enum DrawMode {
 pub struct App {
     window: Option<Arc<Window>>,
     delta: f64,
-    buffer: Vec<u8>,
-    renderer: Option<Renderer>,
+    buffer: Vec<f32>,
+    renderer: Arc<Mutex<Option<Renderer>>>,
     grid: Grid,
 
     draw_mode: DrawMode,
@@ -46,8 +46,8 @@ impl App {
         Self {
             window: None,
             delta: 1.0,
-            buffer: vec![0u8; 4 * (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
-            renderer: None,
+            buffer: vec![0.0f32; WIDTH / CELL_SIZE * HEIGHT / CELL_SIZE],
+            renderer: Arc::new(Mutex::new(None)),
             grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
 
             draw_mode: DrawMode::Gas,
@@ -118,6 +118,7 @@ impl ApplicationHandler for App {
         #[cfg(target_arch = "wasm32")]
         let attrs = {
             use wasm_bindgen::JsCast;
+
             let canvas = web_sys::window()
                 .unwrap()
                 .document()
@@ -131,16 +132,31 @@ impl ApplicationHandler for App {
 
         let window = event_loop.create_window(attrs).unwrap();
         let window = Arc::new(window);
+        self.window = Some(window.clone());
 
-        let renderer = pollster::block_on(Renderer::new(
-            &window,
-            WIDTH as u32,
-            HEIGHT as u32,
-            CELL_SIZE as u32,
-        ));
+        let renderer_storage = self.renderer.clone();
 
-        self.window = Some(window);
-        self.renderer = Some(renderer);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let renderer = pollster::block_on(Renderer::new(
+                &window,
+                WIDTH as u32,
+                HEIGHT as u32,
+                CELL_SIZE as u32,
+            ));
+
+            *renderer_storage.lock().unwrap() = Some(renderer);
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            wasm_bindgen_futures::spawn_local(async move {
+                let renderer =
+                    Renderer::new(&window, WIDTH as u32, HEIGHT as u32, CELL_SIZE as u32).await;
+
+                *renderer_storage.lock().unwrap() = Some(renderer);
+            })
+        }
     }
 
     fn window_event(
@@ -151,20 +167,24 @@ impl ApplicationHandler for App {
     ) {
         match event {
             WindowEvent::CloseRequested => {
-                self.renderer = None;
+                if let Ok(mut guard) = self.renderer.lock() {
+                    *guard = None;
+                }
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                self.grid.update(DIFFUSION, self.delta);
-                self.grid.draw(&mut self.buffer);
+                if let Ok(mut guard) = self.renderer.try_lock() {
+                    if let Some(ref mut renderer) = *guard {
+                        self.grid.update(DIFFUSION, self.delta);
+                        self.grid.draw(&mut self.buffer);
 
-                if let Some(renderer) = &mut self.renderer {
-                    renderer.upload_texture(&self.buffer);
-                    renderer.render();
-                }
+                        renderer.upload_texture(&self.buffer);
+                        renderer.render();
 
-                if let Some(window) = &self.window {
-                    window.request_redraw();
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
                 }
             }
             WindowEvent::KeyboardInput {

@@ -1,17 +1,3 @@
-#[derive(Copy, Clone)]
-struct Colour {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
-}
-
-impl Colour {
-    pub fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
-        Self { r, g, b, a }
-    }
-}
-
 pub struct Grid {
     pub width: usize,
     pub height: usize,
@@ -38,18 +24,16 @@ impl Grid {
         }
     }
 
-    pub fn draw(&self, buffer: &mut [u8]) {
+    pub fn draw(&self, buffer: &mut [f32]) {
         for y in 0..self.height {
             for x in 0..self.width {
                 let idx = y * self.width + x;
 
                 if self.walls[idx] {
-                    self.draw_cell(x, y, buffer, Colour::new(128, 128, 128, 255));
-                    continue;
+                    buffer[idx] = -1.0;
+                } else {
+                    buffer[idx] = self.concentrations[idx] as f32;
                 }
-
-                let colour = self.generate_heatmap(idx);
-                self.draw_cell(x, y, buffer, colour);
             }
         }
     }
@@ -365,47 +349,5 @@ impl Grid {
             None
         };
         [left, right, up, down]
-    }
-
-    fn generate_heatmap(&self, idx: usize) -> Colour {
-        let concentration = self.concentrations[idx].clamp(0.0, 1.0);
-
-        let stops = [
-            (0.01, Colour::new(0, 0, 75, 255)),
-            (0.25, Colour::new(0, 204, 255, 255)),
-            (0.5, Colour::new(0, 255, 0, 255)),
-            (0.75, Colour::new(255, 255, 0, 255)),
-            (1.0, Colour::new(255, 0, 0, 255)),
-        ];
-
-        for i in 0..(stops.len() - 1) {
-            let (concentration0, colour0) = stops[i];
-            let (concentration1, colour1) = stops[i + 1];
-
-            if concentration >= concentration0 && concentration <= concentration1 {
-                let a = (concentration - concentration0) / (concentration1 - concentration0);
-
-                let r = self.lerp(colour0.r as f64, colour1.r as f64, a);
-                let g = self.lerp(colour0.g as f64, colour1.g as f64, a);
-                let b = self.lerp(colour0.b as f64, colour1.b as f64, a);
-
-                return Colour::new(r as u8, g as u8, b as u8, 255);
-            }
-        }
-
-        Colour::new(0, 0, 0, 255)
-    }
-
-    fn lerp(&self, a: f64, b: f64, t: f64) -> f64 {
-        a + (b - a) * t
-    }
-
-    fn draw_cell(&self, x: usize, y: usize, buffer: &mut [u8], colour: Colour) {
-        let idx = (y * self.width + x) * 4;
-
-        buffer[idx] = colour.r;
-        buffer[idx + 1] = colour.g;
-        buffer[idx + 2] = colour.b;
-        buffer[idx + 3] = colour.a;
     }
 }

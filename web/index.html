@@ -1,18 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
-    <meta charset="utf-8">
+    <meta charset="utf-8" />
     <title>Diffusion</title>
-      <style>
-      body { margin: 0; background: black; }
-      canvas { display: block; }
+    <style>
+      body {
+        margin: 0;
+        background: black;
+      }
+
+      canvas {
+        display: block;
+      }
     </style>
   </head>
+
   <body>
     <canvas id="canvas" width="800" height="600"></canvas>
     <script type="module">
-      import init from './pkg/web.js';
-      await init();
+      import init from "./pkg/web.js";
+      init().then(() => {
+        console.log("WASM Loaded");
+      });
     </script>
   </body>
 </html>
