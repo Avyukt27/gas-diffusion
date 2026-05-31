@@ -22,7 +22,10 @@ pub struct Renderer {
 
 impl Renderer {
     pub async fn new(window: &Arc<Window>, width: u32, height: u32, cell_size: u32) -> Self {
-        let instance = wgpu::Instance::default();
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::GL | wgpu::Backends::BROWSER_WEBGPU,
+            ..Default::default()
+        });
 
         let surface = instance.create_surface(window.clone()).unwrap();
         let adapter = instance
@@ -34,7 +37,16 @@ impl Renderer {
             .await
             .unwrap();
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor::default())
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("Simulation Device"),
+                required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
+                required_limits: if cfg!(target_arch = "wasm32") {
+                    wgpu::Limits::downlevel_webgl2_defaults()
+                } else {
+                    wgpu::Limits::default()
+                },
+                ..Default::default()
+            })
             .await
             .unwrap();
 
@@ -63,9 +75,7 @@ impl Renderer {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::R32Float,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
 

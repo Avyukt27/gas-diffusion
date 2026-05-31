@@ -1,27 +1,39 @@
 <!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Diffusion</title>
-    <style>
-      body {
-        margin: 0;
-        background: black;
-      }
+<html lang="en">
 
-      canvas {
-        display: block;
-      }
-    </style>
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diffusion Simulation</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
 
-  <body>
-    <canvas id="canvas" width="800" height="600"></canvas>
-    <script type="module">
-      import init from "./pkg/web.js";
-      init().then(() => {
-        console.log("WASM Loaded");
-      });
-    </script>
-  </body>
+    canvas {
+      background: #000;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import init from "./pkg/web.js";
+
+    async function run() {
+      await init();
+    }
+
+    run();
+  </script>
+</body>
+
 </html>

@@ -1,7 +1,5 @@
 use std::sync::{Arc, Mutex};
 
-#[cfg(target_arch = "wasm32")]
-use winit::platform::web::WindowAttributesExtWebSys;
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalPosition,
@@ -118,6 +116,7 @@ impl ApplicationHandler for App {
         #[cfg(target_arch = "wasm32")]
         let attrs = {
             use wasm_bindgen::JsCast;
+            use winit::platform::web::WindowAttributesExtWebSys;
 
             let canvas = web_sys::window()
                 .unwrap()
