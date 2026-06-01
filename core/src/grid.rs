@@ -68,10 +68,12 @@ impl Grid {
                     }
                 }
 
-                next[idx] = advection
+                let computed_concentration = advection
                     + diffusion_coefficient * delta * (neighbor_sum - fluid_count * advection)
                         / (self.cell_size * self.cell_size) as f64
                     + source_rate;
+
+                next[idx] = computed_concentration.max(0.0);
             }
         }
 

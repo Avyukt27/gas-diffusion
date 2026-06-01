@@ -44,7 +44,7 @@ impl App {
         Self {
             window: None,
             delta: 1.0,
-            buffer: vec![0.0f32; WIDTH / CELL_SIZE * HEIGHT / CELL_SIZE],
+            buffer: vec![0.0f32; (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
             renderer: Arc::new(Mutex::new(None)),
             grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
 
@@ -109,12 +109,12 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let attrs = WindowAttributes::default()
+        let mut attrs = WindowAttributes::default()
             .with_title("Diffusion Simulation Window")
             .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64));
 
         #[cfg(target_arch = "wasm32")]
-        let attrs = {
+        {
             use wasm_bindgen::JsCast;
             use winit::platform::web::WindowAttributesExtWebSys;
 
@@ -126,7 +126,10 @@ impl ApplicationHandler for App {
                 .unwrap()
                 .dyn_into::<web_sys::HtmlCanvasElement>()
                 .unwrap();
-            attrs.with_canvas(Some(canvas))
+
+            canvas.set_width(WIDTH as u32);
+            canvas.set_height(HEIGHT as u32);
+            attrs = attrs.with_canvas(Some(canvas));
         };
 
         let window = event_loop.create_window(attrs).unwrap();
@@ -138,16 +141,17 @@ impl ApplicationHandler for App {
         #[cfg(not(target_arch = "wasm32"))]
         {
             let renderer = pollster::block_on(Renderer::new(&window, CELL_SIZE as u32));
-
             *renderer_storage.lock().unwrap() = Some(renderer);
         }
 
         #[cfg(target_arch = "wasm32")]
         {
+            let window_clone = window.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let renderer = Renderer::new(&window, CELL_SIZE as u32).await;
-
+                let mut renderer = Renderer::new(&window_clone, CELL_SIZE as u32).await;
+                renderer.resize(WIDTH as u32, HEIGHT as u32);
                 *renderer_storage.lock().unwrap() = Some(renderer);
+                window_clone.request_redraw();
             })
         }
     }
@@ -173,10 +177,6 @@ impl ApplicationHandler for App {
 
                         renderer.upload_texture(&self.buffer);
                         renderer.render();
-
-                        if let Some(window) = &self.window {
-                            window.request_redraw();
-                        }
                     }
                 }
             }
@@ -219,18 +219,39 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                self.mouse_position = position;
+                let mut adjusted_position = position;
+
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    adjusted_position.y =
+                        (self.grid.height * self.grid.cell_size) as f64 - adjusted_position.y;
+                }
+
+                self.mouse_position = adjusted_position;
+
                 if self.mouse_down {
+                    let cell_x_f = self.mouse_position.x / self.grid.cell_size as f64;
+                    let cell_y_f = self.mouse_position.y / self.grid.cell_size as f64;
+
+                    let prev_cell_x_f = self.prev_mouse_position.x / self.grid.cell_size as f64;
+                    let prev_cell_y_f = self.prev_mouse_position.y / self.grid.cell_size as f64;
+
+                    let start_x = (cell_x_f.max(0.0) as usize).min(self.grid.width - 1);
+                    let start_y = (cell_y_f.max(0.0) as usize).min(self.grid.height - 1);
+
+                    let prev_cell_x = (prev_cell_x_f.max(0.0) as usize).min(self.grid.width - 1);
+                    let prev_cell_y = (prev_cell_y_f.max(0.0) as usize).min(self.grid.height - 1);
+
                     self.apply_brush(
-                        self.mouse_position.x as usize / self.grid.cell_size,
-                        self.mouse_position.y as usize / self.grid.cell_size,
-                        self.prev_mouse_position.x as usize / self.grid.cell_size,
-                        self.prev_mouse_position.y as usize / self.grid.cell_size,
+                        start_x,
+                        start_y,
+                        prev_cell_x,
+                        prev_cell_y,
                         self.draw_size,
                         self.draw_size,
                     );
                 }
-                self.prev_mouse_position = position;
+                self.prev_mouse_position = adjusted_position;
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == MouseButton::Left {
@@ -257,7 +278,22 @@ impl ApplicationHandler for App {
                     self.draw_size -= 1;
                 }
             }
+            WindowEvent::Resized(new_size) => {
+                if new_size.width > 0 && new_size.height > 0 {
+                    if let Ok(mut guard) = self.renderer.lock() {
+                        if let Some(ref mut renderer) = *guard {
+                            renderer.resize(new_size.width, new_size.height);
+                        }
+                    }
+                }
+            }
             _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        if let Some(window) = &self.window {
+            window.request_redraw();
         }
     }
 }
