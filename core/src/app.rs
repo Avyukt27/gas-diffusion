@@ -31,6 +31,13 @@ pub struct App {
     renderer: Arc<Mutex<Option<Renderer>>>,
     grid: Grid,
 
+    #[cfg(target_arch = "wasm32")]
+    last_frame_time: f64,
+    #[cfg(target_arch = "wasm32")]
+    frame_count: u32,
+    #[cfg(target_arch = "wasm32")]
+    fps_timer: f64,
+
     draw_mode: DrawMode,
     draw_size: usize,
     draw_intensity: f64,
@@ -47,6 +54,13 @@ impl App {
             buffer: vec![0.0f32; (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
             renderer: Arc::new(Mutex::new(None)),
             grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
+
+            #[cfg(target_arch = "wasm32")]
+            last_frame_time: 0.0,
+            #[cfg(target_arch = "wasm32")]
+            frame_count: 0,
+            #[cfg(target_arch = "wasm32")]
+            fps_timer: 0.0,
 
             draw_mode: DrawMode::Gas,
             draw_size: 1,
@@ -170,6 +184,26 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let current_time = web_sys::window().unwrap().performance().unwrap().now();
+                    if self.last_frame_time == 0.0 {
+                        self.last_frame_time = current_time;
+                    }
+                    let elapsed_seconds = (current_time - self.last_frame_time) / 1000.0;
+                    self.last_frame_time = current_time;
+
+                    self.frame_count += 1;
+                    self.fps_timer += elapsed_seconds;
+
+                    if self.fps_timer >= 1.0 {
+                        let fps = self.frame_count as f64 / self.fps_timer;
+                        web_sys::console::log_1(&format!("FPS: {:.1}", fps).into());
+                        self.frame_count = 0;
+                        self.fps_timer = 0.0;
+                    }
+                }
+
                 if let Ok(mut guard) = self.renderer.try_lock() {
                     if let Some(ref mut renderer) = *guard {
                         self.grid.update(DIFFUSION, self.delta);
