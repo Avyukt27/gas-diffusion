@@ -219,15 +219,7 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                let mut adjusted_position = position;
-
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    adjusted_position.y =
-                        (self.grid.height * self.grid.cell_size) as f64 - adjusted_position.y;
-                }
-
-                self.mouse_position = adjusted_position;
+                self.mouse_position = position;
 
                 if self.mouse_down {
                     let cell_x_f = self.mouse_position.x / self.grid.cell_size as f64;
@@ -251,7 +243,7 @@ impl ApplicationHandler for App {
                         self.draw_size,
                     );
                 }
-                self.prev_mouse_position = adjusted_position;
+                self.prev_mouse_position = position;
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == MouseButton::Left {

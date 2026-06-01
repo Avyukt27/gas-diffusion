@@ -35,6 +35,18 @@ impl Renderer {
             .await
             .unwrap();
 
+        let info = adapter.get_info();
+        #[cfg(target_arch = "wasm32")]
+        {
+            web_sys::console::log_1(
+                &format!(
+                    "wgpu Backend Active: {:?} | Driver: {} | Device: {}",
+                    info.backend, info.driver, info.name
+                )
+                .into(),
+            );
+        }
+
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("Simulation Device"),
