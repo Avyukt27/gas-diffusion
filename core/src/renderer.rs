@@ -2,20 +2,19 @@ use std::sync::Arc;
 use winit::window::Window;
 
 pub struct Renderer {
-    width: u32,
-    height: u32,
-    cell_size: u32,
+    pub width: u32,
+    pub height: u32,
+    pub cell_size: u32,
 
     pub surface: wgpu::Surface<'static>,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
+    pub config: wgpu::SurfaceConfiguration,
 
-    texture: wgpu::Texture,
-    _texture_view: wgpu::TextureView,
+    pub texture: wgpu::Texture,
 
-    pipeline: wgpu::RenderPipeline,
-    bind_group: wgpu::BindGroup,
+    pub pipeline: wgpu::RenderPipeline,
+    pub bind_group: wgpu::BindGroup,
 }
 
 impl Renderer {
@@ -98,7 +97,9 @@ impl Renderer {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::R32Float,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
             label: Some("Simulation Texture"),
             view_formats: &[],
         };
@@ -209,7 +210,6 @@ impl Renderer {
             queue,
             config,
             texture,
-            _texture_view: texture_view,
             pipeline,
             bind_group,
         }
@@ -257,71 +257,59 @@ impl Renderer {
         output.present();
     }
 
-    pub fn upload_texture(&self, buffer: &[f32]) {
-        let grid_width = self.width / self.cell_size;
-        let grid_height = self.height / self.cell_size;
-
+    pub fn upload_texture(
+        &self,
+        concentrations: &[f64],
+        walls: &[bool],
+        sim_width: u32,
+        sim_height: u32,
+    ) {
         let bytes_per_pixel = 4;
-        let unpadded_bytes_per_row = grid_width * bytes_per_pixel;
+        let unpadded_bytes_per_row = sim_width * bytes_per_pixel;
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-        let padding = (align - unpadded_bytes_per_row % align) % align;
+        let padding = (align - (unpadded_bytes_per_row % align)) % align;
         let padded_bytes_per_row = unpadded_bytes_per_row + padding;
+
         let f32_per_row = padded_bytes_per_row / bytes_per_pixel;
+        let mut aligned_buffer = vec![0.0f32; f32_per_row as usize * sim_height as usize];
 
-        if padding == 0 {
-            self.queue.write_texture(
-                wgpu::TexelCopyTextureInfo {
-                    texture: &self.texture,
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                bytemuck::cast_slice(buffer),
-                wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(padded_bytes_per_row),
-                    rows_per_image: Some(grid_height),
-                },
-                wgpu::Extent3d {
-                    width: grid_width,
-                    height: grid_height,
-                    depth_or_array_layers: 1,
-                },
-            );
-        } else {
-            let mut aligned_buffer = vec![0.0f32; f32_per_row as usize * grid_height as usize];
+        for y in 0..sim_height as usize {
+            let src_start = y * sim_width as usize;
+            let dest_start = y * f32_per_row as usize;
 
-            for y in 0..grid_height as usize {
-                let src_start = y * grid_width as usize;
-                let src_end = src_start + grid_width as usize;
-                let dest_start = y * f32_per_row as usize;
+            for x in 0..sim_width as usize {
+                let sim_idx = src_start + x;
+                let dest_idx = dest_start + x;
 
-                if src_end <= buffer.len() {
-                    aligned_buffer[dest_start..dest_start + grid_width as usize]
-                        .copy_from_slice(&buffer[src_start..src_end]);
+                if sim_idx < concentrations.len() {
+                    if walls[sim_idx] {
+                        aligned_buffer[dest_idx] = -1.0;
+                    } else {
+                        aligned_buffer[dest_idx] = concentrations[sim_idx] as f32;
+                    }
                 }
             }
-
-            self.queue.write_texture(
-                wgpu::TexelCopyTextureInfo {
-                    texture: &self.texture,
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                bytemuck::cast_slice(&aligned_buffer),
-                wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(padded_bytes_per_row),
-                    rows_per_image: Some(grid_height),
-                },
-                wgpu::Extent3d {
-                    width: grid_width,
-                    height: grid_height,
-                    depth_or_array_layers: 1,
-                },
-            );
         }
+
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            bytemuck::cast_slice(&aligned_buffer[..]),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(padded_bytes_per_row),
+                rows_per_image: Some(sim_height),
+            },
+            wgpu::Extent3d {
+                width: sim_width,
+                height: sim_height,
+                depth_or_array_layers: 1,
+            },
+        );
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -345,7 +333,9 @@ impl Renderer {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::R32Float,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_DST
+                    | wgpu::TextureUsages::RENDER_ATTACHMENT,
                 label: Some("Simulation Texture"),
                 view_formats: &[],
             };
@@ -377,8 +367,6 @@ impl Renderer {
                 ],
                 label: Some("Simulation Bind Group"),
             });
-
-            self._texture_view = texture_view;
         }
     }
 }

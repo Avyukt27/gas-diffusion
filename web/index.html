@@ -1,43 +1,45 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Diffusion Simulation</title>
-    <style>
-      body {
-        margin: 0;
-        background-color: #111;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        user-select: none;
-      }
 
-      canvas {
-        background: #000;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-        outline: none;
-        cursor: crosshair;
-        touch-action: none;
-        user-select: none;
-      }
-    </style>
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diffusion Simulation</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      user-select: none;
+    }
 
-  <body>
-    <canvas id="canvas" width="640" height="640"></canvas>
+    canvas {
+      background: #000;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      outline: none;
+      cursor: crosshair;
+      touch-action: none;
+      user-select: none;
+    }
+  </style>
+</head>
 
-    <script type="module">
-      import init, { start } from "./pkg/web.js";
+<body>
+  <canvas id="canvas" width="800" height="600"></canvas>
 
-      async function run() {
-        await init();
-        start();
-      }
+  <script type="module">
+    import init, {start} from "./pkg/web.js";
 
-      run();
-    </script>
-  </body>
+    async function run() {
+      await init();
+      start();
+    }
+
+    run();
+  </script>
+</body>
+
 </html>

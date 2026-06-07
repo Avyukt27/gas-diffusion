@@ -27,7 +27,6 @@ enum DrawMode {
 pub struct App {
     window: Option<Arc<Window>>,
     delta: f64,
-    buffer: Vec<f32>,
     renderer: Arc<Mutex<Option<Renderer>>>,
     grid: Grid,
 
@@ -51,7 +50,6 @@ impl App {
         Self {
             window: None,
             delta: 1.0,
-            buffer: vec![0.0f32; (WIDTH / CELL_SIZE) * (HEIGHT / CELL_SIZE)],
             renderer: Arc::new(Mutex::new(None)),
             grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
 
@@ -90,6 +88,9 @@ impl App {
         for y in start_y..max_y {
             for x in start_x..max_x {
                 let idx = y * self.grid.width + x;
+                if idx >= self.grid.concentrations.len() {
+                    continue;
+                }
                 match self.draw_mode {
                     DrawMode::Gas => {
                         self.grid.concentrations[idx] = self.draw_intensity.clamp(0.0, 1.0);
@@ -107,12 +108,11 @@ impl App {
                         let dy = start_y as f64 - prev_cell_y as f64;
                         let strength = 5.0;
                         let vel = (dx * strength, dy * strength);
-                        let max_vel = self.grid.cell_size as f64 / self.delta * 0.5;
 
                         self.grid.advections[idx].0 =
-                            (self.grid.advections[idx].0 + vel.0).clamp(-max_vel, max_vel);
+                            (self.grid.advections[idx].0 + vel.0).clamp(-100.0, 100.0);
                         self.grid.advections[idx].1 =
-                            (self.grid.advections[idx].1 + vel.1).clamp(-max_vel, max_vel);
+                            (self.grid.advections[idx].1 + vel.1).clamp(-100.0, 100.0);
                     }
                     DrawMode::Stopper => self.grid.walls[idx] = true,
                 }
@@ -163,7 +163,9 @@ impl ApplicationHandler for App {
             let window_clone = window.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 let mut renderer = Renderer::new(&window_clone, CELL_SIZE as u32).await;
-                renderer.resize(WIDTH as u32, HEIGHT as u32);
+                let physical_size = window_clone.inner_size();
+                renderer.resize(physical_size.width, physical_size.height);
+
                 *renderer_storage.lock().unwrap() = Some(renderer);
                 window_clone.request_redraw();
             })
@@ -193,6 +195,7 @@ impl ApplicationHandler for App {
                     let elapsed_seconds = (current_time - self.last_frame_time) / 1000.0;
                     self.last_frame_time = current_time;
 
+                    self.delta = elapsed_seconds.min(0.033);
                     self.frame_count += 1;
                     self.fps_timer += elapsed_seconds;
 
@@ -204,12 +207,15 @@ impl ApplicationHandler for App {
                     }
                 }
 
-                if let Ok(mut guard) = self.renderer.try_lock() {
+                if let Ok(mut guard) = self.renderer.lock() {
                     if let Some(ref mut renderer) = *guard {
                         self.grid.update(DIFFUSION, self.delta);
-                        self.grid.draw(&mut self.buffer);
-
-                        renderer.upload_texture(&self.buffer);
+                        renderer.upload_texture(
+                            &self.grid.concentrations,
+                            &self.grid.walls,
+                            self.grid.width as u32,
+                            self.grid.height as u32,
+                        );
                         renderer.render();
                     }
                 }
@@ -255,41 +261,62 @@ impl ApplicationHandler for App {
             WindowEvent::CursorMoved { position, .. } => {
                 self.mouse_position = position;
 
-                if self.mouse_down {
-                    let cell_x_f = self.mouse_position.x / self.grid.cell_size as f64;
-                    let cell_y_f = self.mouse_position.y / self.grid.cell_size as f64;
-
-                    let prev_cell_x_f = self.prev_mouse_position.x / self.grid.cell_size as f64;
-                    let prev_cell_y_f = self.prev_mouse_position.y / self.grid.cell_size as f64;
-
-                    let start_x = (cell_x_f.max(0.0) as usize).min(self.grid.width - 1);
-                    let start_y = (cell_y_f.max(0.0) as usize).min(self.grid.height - 1);
-
-                    let prev_cell_x = (prev_cell_x_f.max(0.0) as usize).min(self.grid.width - 1);
-                    let prev_cell_y = (prev_cell_y_f.max(0.0) as usize).min(self.grid.height - 1);
-
-                    self.apply_brush(
-                        start_x,
-                        start_y,
-                        prev_cell_x,
-                        prev_cell_y,
-                        self.draw_size,
-                        self.draw_size,
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let cell_x = self.mouse_position.x as usize / self.grid.cell_size;
+                    let cell_y = self.mouse_position.y as usize / self.grid.cell_size;
+                    web_sys::console::log_1(
+                        &format!(
+                            "Click at X: {}, Y: {}\nConcentration at mouse: {}",
+                            cell_x,
+                            cell_y,
+                            self.grid.concentrations[cell_y * self.grid.width + cell_x]
+                        )
+                        .into(),
                     );
+                }
+                if self.mouse_down {
+                    let cell_x = self.mouse_position.x as usize / self.grid.cell_size;
+                    let cell_y = self.mouse_position.y as usize / self.grid.cell_size;
+
+                    let prev_cell_x = self.prev_mouse_position.x as usize / self.grid.cell_size;
+                    let prev_cell_y = self.prev_mouse_position.y as usize / self.grid.cell_size;
+
+                    if cell_x < self.grid.width
+                        && cell_y < self.grid.height
+                        && prev_cell_x < self.grid.width
+                        && prev_cell_y < self.grid.height
+                    {
+                        self.apply_brush(
+                            cell_x,
+                            cell_y,
+                            prev_cell_x,
+                            prev_cell_y,
+                            self.draw_size,
+                            self.draw_size,
+                        );
+                    }
                 }
                 self.prev_mouse_position = position;
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == MouseButton::Left {
                     self.mouse_down = state.is_pressed();
-                    self.apply_brush(
-                        self.mouse_position.x as usize / self.grid.cell_size,
-                        self.mouse_position.y as usize / self.grid.cell_size,
-                        self.prev_mouse_position.x as usize / self.grid.cell_size,
-                        self.prev_mouse_position.y as usize / self.grid.cell_size,
-                        self.draw_size,
-                        self.draw_size,
-                    );
+                    if self.mouse_down {
+                        let cell_x = self.mouse_position.x as usize / self.grid.cell_size;
+                        let cell_y = self.mouse_position.y as usize / self.grid.cell_size;
+
+                        if cell_x < self.grid.width && cell_y < self.grid.height {
+                            self.apply_brush(
+                                cell_x,
+                                cell_y,
+                                cell_x,
+                                cell_y,
+                                self.draw_size,
+                                self.draw_size,
+                            );
+                        }
+                    }
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {

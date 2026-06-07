@@ -24,20 +24,6 @@ impl Grid {
         }
     }
 
-    pub fn draw(&self, buffer: &mut [f32]) {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let idx = y * self.width + x;
-
-                if self.walls[idx] {
-                    buffer[idx] = -1.0;
-                } else {
-                    buffer[idx] = self.concentrations[idx] as f32;
-                }
-            }
-        }
-    }
-
     pub fn update(&mut self, diffusion_coefficient: f64, delta: f64) {
         self.project();
         let mut next = self.concentrations.clone();
@@ -73,7 +59,13 @@ impl Grid {
                         / (self.cell_size * self.cell_size) as f64
                     + source_rate;
 
-                next[idx] = computed_concentration.max(0.0);
+                if computed_concentration > 1.0 {
+                    next[idx] = 1.0;
+                } else if computed_concentration < 1e-4 {
+                    next[idx] = 0.0;
+                } else {
+                    next[idx] = computed_concentration;
+                }
             }
         }
 
