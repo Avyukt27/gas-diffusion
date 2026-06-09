@@ -25,24 +25,24 @@ enum DrawMode {
 }
 
 pub struct App {
-    window: Option<Arc<Window>>,
-    delta: f64,
-    renderer: Arc<Mutex<Option<Renderer>>>,
-    grid: Grid,
+    pub window: Option<Arc<Window>>,
+    pub delta: f64,
+    pub renderer: Arc<Mutex<Option<Renderer>>>,
+    pub grid: Grid,
 
     #[cfg(target_arch = "wasm32")]
-    last_frame_time: f64,
+    pub last_frame_time: f64,
     #[cfg(target_arch = "wasm32")]
-    frame_count: u32,
+    pub frame_count: u32,
     #[cfg(target_arch = "wasm32")]
-    fps_timer: f64,
+    pub fps_timer: f64,
 
-    draw_mode: DrawMode,
-    draw_size: usize,
-    draw_intensity: f64,
-    mouse_down: bool,
-    prev_mouse_position: PhysicalPosition<f64>,
-    mouse_position: PhysicalPosition<f64>,
+    pub draw_mode: DrawMode,
+    pub draw_size: usize,
+    pub draw_intensity: f64,
+    pub mouse_down: bool,
+    pub prev_mouse_position: PhysicalPosition<f64>,
+    pub mouse_position: PhysicalPosition<f64>,
 }
 
 impl App {
