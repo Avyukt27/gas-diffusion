@@ -108,11 +108,12 @@ impl App {
                         let dy = start_y as f64 - prev_cell_y as f64;
                         let strength = 5.0;
                         let vel = (dx * strength, dy * strength);
+                        let max_vel = self.grid.cell_size as f64 / self.delta * 0.5;
 
                         self.grid.advections[idx].0 =
-                            (self.grid.advections[idx].0 + vel.0).clamp(-100.0, 100.0);
+                            (self.grid.advections[idx].0 + vel.0).clamp(-max_vel, max_vel);
                         self.grid.advections[idx].1 =
-                            (self.grid.advections[idx].1 + vel.1).clamp(-100.0, 100.0);
+                            (self.grid.advections[idx].1 + vel.1).clamp(-max_vel, max_vel);
                     }
                     DrawMode::Stopper => self.grid.walls[idx] = true,
                 }

@@ -3,6 +3,9 @@ name = "core"
 version = "2.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["rlib"]
+
 [dependencies]
 winit = "0.30.13"
 pollster = "0.4.0"
