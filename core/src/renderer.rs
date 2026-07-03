@@ -11,18 +11,16 @@ pub struct Renderer {
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
 
+    pub bind_group_layout: wgpu::BindGroupLayout,
+    pub bind_group: wgpu::BindGroup,
     pub texture: wgpu::Texture,
 
     pub pipeline: wgpu::RenderPipeline,
-    pub bind_group: wgpu::BindGroup,
 }
 
 impl Renderer {
     pub async fn new(window: &Arc<Window>, cell_size: u32) -> Self {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::BROWSER_WEBGPU | wgpu::Backends::PRIMARY,
-            ..Default::default()
-        });
+        let instance = wgpu::Instance::default();
 
         let surface = instance.create_surface(window.clone()).unwrap();
         let adapter = instance
@@ -35,16 +33,6 @@ impl Renderer {
             .unwrap();
 
         let info = adapter.get_info();
-        #[cfg(target_arch = "wasm32")]
-        {
-            web_sys::console::log_1(
-                &format!(
-                    "wgpu Backend Active: {:?} | Driver: {} | Device: {}",
-                    info.backend, info.driver, info.name
-                )
-                .into(),
-            );
-        }
 
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
@@ -183,6 +171,7 @@ impl Renderer {
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
 
@@ -201,6 +190,15 @@ impl Renderer {
             label: Some("Simulation Bind Group"),
         });
 
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "wgpu Backend Active: {:?} | Driver: {} | Device: {}\nWidth: {}\nHeight: {}",
+                info.backend, info.driver, info.name, width, height
+            )
+            .into(),
+        );
+
         Self {
             width,
             height,
@@ -209,9 +207,10 @@ impl Renderer {
             device,
             queue,
             config,
+            bind_group_layout,
+            bind_group,
             texture,
             pipeline,
-            bind_group,
         }
     }
 
@@ -312,21 +311,22 @@ impl Renderer {
         );
     }
 
-    pub fn resize(&mut self, width: u32, height: u32) {
-        if width > 0 && height > 0 {
-            self.width = width;
-            self.height = height;
-            self.config.width = width;
-            self.config.height = height;
+    pub fn resize(&mut self, new_width: u32, new_height: u32) {
+        if new_width > 0 && new_height > 0 {
+            self.width = new_width;
+            self.height = new_height;
+
+            self.config.width = new_width;
+            self.config.height = new_height;
             self.surface.configure(&self.device, &self.config);
 
-            let grid_width = width / self.cell_size;
-            let grid_height = height / self.cell_size;
+            let grid_width = (new_width / self.cell_size).max(1);
+            let grid_height = (new_height / self.cell_size).max(1);
 
             let texture_descriptor = wgpu::TextureDescriptor {
                 size: wgpu::Extent3d {
-                    width: grid_width.max(1),
-                    height: grid_height.max(1),
+                    width: grid_width,
+                    height: grid_height,
                     depth_or_array_layers: 1,
                 },
                 mip_level_count: 1,
@@ -336,7 +336,7 @@ impl Renderer {
                 usage: wgpu::TextureUsages::TEXTURE_BINDING
                     | wgpu::TextureUsages::COPY_DST
                     | wgpu::TextureUsages::RENDER_ATTACHMENT,
-                label: Some("Simulation Texture"),
+                label: Some("Simulation Texture (Resized)"),
                 view_formats: &[],
             };
 
@@ -345,8 +345,17 @@ impl Renderer {
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
 
+            let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Nearest,
+                min_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::FilterMode::Nearest,
+                ..Default::default()
+            });
+
             self.bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &self.pipeline.get_bind_group_layout(0),
+                layout: &self.bind_group_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -354,18 +363,10 @@ impl Renderer {
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&self.device.create_sampler(
-                            &wgpu::SamplerDescriptor {
-                                address_mode_u: wgpu::AddressMode::ClampToEdge,
-                                address_mode_v: wgpu::AddressMode::ClampToEdge,
-                                mag_filter: wgpu::FilterMode::Nearest,
-                                min_filter: wgpu::FilterMode::Nearest,
-                                ..Default::default()
-                            },
-                        )),
+                        resource: wgpu::BindingResource::Sampler(&sampler),
                     },
                 ],
-                label: Some("Simulation Bind Group"),
+                label: Some("Simulation Bind Group (Resized)"),
             });
         }
     }

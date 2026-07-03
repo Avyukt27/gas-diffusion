@@ -10,13 +10,13 @@ use winit::{
 
 use crate::{grid::Grid, renderer::Renderer};
 
-const WIDTH: usize = 800;
-const HEIGHT: usize = 600;
+const WIDTH: usize = 640;
+const HEIGHT: usize = 480;
 const CELL_SIZE: usize = 10;
 const DIFFUSION: f64 = 2.0;
 
 #[derive(PartialEq, Eq, Debug)]
-enum DrawMode {
+pub enum DrawMode {
     Gas,
     Source,
     Sink,
@@ -142,8 +142,16 @@ impl ApplicationHandler for App {
                 .dyn_into::<web_sys::HtmlCanvasElement>()
                 .unwrap();
 
+            let style = canvas.style();
+            style
+                .set_property("width", &format!("{}px", WIDTH))
+                .unwrap();
+            style
+                .set_property("height", &format!("{}px", HEIGHT))
+                .unwrap();
             canvas.set_width(WIDTH as u32);
             canvas.set_height(HEIGHT as u32);
+
             attrs = attrs.with_canvas(Some(canvas));
         };
 
@@ -163,11 +171,16 @@ impl ApplicationHandler for App {
         {
             let window_clone = window.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let mut renderer = Renderer::new(&window_clone, CELL_SIZE as u32).await;
-                let physical_size = window_clone.inner_size();
-                renderer.resize(physical_size.width, physical_size.height);
+                let renderer = Renderer::new(&window_clone, CELL_SIZE as u32).await;
+                let scale_factor = window_clone.scale_factor();
+                let physical_size = winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64)
+                    .to_physical::<u32>(scale_factor);
+                let mut renderer_lock = renderer_storage.lock().unwrap();
+                *renderer_lock = Some(renderer);
+                if let Some(ref mut r) = *renderer_lock {
+                    r.resize(physical_size.width, physical_size.height);
+                }
 
-                *renderer_storage.lock().unwrap() = Some(renderer);
                 window_clone.request_redraw();
             })
         }
@@ -187,27 +200,6 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                #[cfg(target_arch = "wasm32")]
-                {
-                    let current_time = web_sys::window().unwrap().performance().unwrap().now();
-                    if self.last_frame_time == 0.0 {
-                        self.last_frame_time = current_time;
-                    }
-                    let elapsed_seconds = (current_time - self.last_frame_time) / 1000.0;
-                    self.last_frame_time = current_time;
-
-                    self.delta = elapsed_seconds.min(0.033);
-                    self.frame_count += 1;
-                    self.fps_timer += elapsed_seconds;
-
-                    if self.fps_timer >= 1.0 {
-                        let fps = self.frame_count as f64 / self.fps_timer;
-                        web_sys::console::log_1(&format!("FPS: {:.1}", fps).into());
-                        self.frame_count = 0;
-                        self.fps_timer = 0.0;
-                    }
-                }
-
                 if let Ok(mut guard) = self.renderer.lock() {
                     if let Some(ref mut renderer) = *guard {
                         self.grid.update(DIFFUSION, self.delta);
@@ -218,6 +210,18 @@ impl ApplicationHandler for App {
                             self.grid.height as u32,
                         );
                         renderer.render();
+                        #[cfg(target_arch = "wasm32")]
+                        {
+                            if let Some(window) = &self.window {
+                                window.request_redraw();
+                            }
+                        }
+                    }
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    if let Some(window) = &self.window {
+                        window.request_redraw();
                     }
                 }
             }
@@ -261,21 +265,6 @@ impl ApplicationHandler for App {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.mouse_position = position;
-
-                #[cfg(target_arch = "wasm32")]
-                {
-                    let cell_x = self.mouse_position.x as usize / self.grid.cell_size;
-                    let cell_y = self.mouse_position.y as usize / self.grid.cell_size;
-                    web_sys::console::log_1(
-                        &format!(
-                            "Click at X: {}, Y: {}\nConcentration at mouse: {}",
-                            cell_x,
-                            cell_y,
-                            self.grid.concentrations[cell_y * self.grid.width + cell_x]
-                        )
-                        .into(),
-                    );
-                }
                 if self.mouse_down {
                     let cell_x = self.mouse_position.x as usize / self.grid.cell_size;
                     let cell_y = self.mouse_position.y as usize / self.grid.cell_size;
@@ -345,9 +334,10 @@ impl ApplicationHandler for App {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
         if let Some(window) = &self.window {
-            window.request_redraw();
+            window.request_redraw()
         }
     }
 }
