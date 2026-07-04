@@ -15,7 +15,7 @@ pub struct Renderer {
     // pub bind_group: wgpu::BindGroup,
     // pub texture: wgpu::Texture,
     //
-    // pub pipeline: wgpu::RenderPipeline,
+    pub render_pipeline: wgpu::RenderPipeline,
 }
 
 impl Renderer {
@@ -103,12 +103,12 @@ impl Renderer {
         //
         // let texture = device.create_texture(&texture_descriptor);
         // let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        //
-        // let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        //     label: Some("Shader"),
-        //     source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
-        // });
-        //
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("test_shader.wgsl").into()),
+        });
+
         // let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         //     entries: &[
         //         wgpu::BindGroupLayoutEntry {
@@ -130,51 +130,52 @@ impl Renderer {
         //     ],
         //     label: Some("Simulation Bind Group Layout"),
         // });
-        //
-        // let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        //     label: Some("Render Pipeline Layout"),
-        //     bind_group_layouts: &[&bind_group_layout],
-        //     push_constant_ranges: &[],
-        // });
-        //
-        // let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        //     label: Some("Render Pipeline"),
-        //     layout: Some(&pipeline_layout),
-        //     vertex: wgpu::VertexState {
-        //         module: &shader,
-        //         entry_point: Some("vtx_main"),
-        //         buffers: &[],
-        //         compilation_options: Default::default(),
-        //     },
-        //     fragment: Some(wgpu::FragmentState {
-        //         module: &shader,
-        //         entry_point: Some("frag_main"),
-        //         targets: &[Some(wgpu::ColorTargetState {
-        //             format: surface_format,
-        //             blend: Some(wgpu::BlendState::REPLACE),
-        //             write_mask: wgpu::ColorWrites::ALL,
-        //         })],
-        //         compilation_options: Default::default(),
-        //     }),
-        //     primitive: wgpu::PrimitiveState {
-        //         topology: wgpu::PrimitiveTopology::TriangleList,
-        //         strip_index_format: None,
-        //         front_face: wgpu::FrontFace::Ccw,
-        //         cull_mode: Some(wgpu::Face::Back),
-        //         polygon_mode: wgpu::PolygonMode::Fill,
-        //         unclipped_depth: false,
-        //         conservative: false,
-        //     },
-        //     depth_stencil: None,
-        //     multisample: wgpu::MultisampleState {
-        //         count: 1,
-        //         mask: !0,
-        //         alpha_to_coverage_enabled: false,
-        //     },
-        //     multiview: None,
-        //     cache: None,
-        // });
-        //
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                immediate_size: 0,
+            });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview_mask: None,
+            cache: None,
+        });
+
         // let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
         //     address_mode_u: wgpu::AddressMode::ClampToEdge,
         //     address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -219,7 +220,7 @@ impl Renderer {
             // bind_group_layout,
             // bind_group,
             // texture,
-            // pipeline,
+            render_pipeline,
         })
     }
 
@@ -253,7 +254,7 @@ impl Renderer {
             });
 
         {
-            let mut _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -275,9 +276,9 @@ impl Renderer {
                 multiview_mask: None,
             });
 
-            // render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_pipeline(&self.render_pipeline);
             // render_pass.set_bind_group(0, &self.bind_group, &[]);
-            // render_pass.draw(0..6, 0..1);
+            render_pass.draw(0..3, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
