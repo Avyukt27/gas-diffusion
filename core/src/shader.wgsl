@@ -33,9 +33,10 @@ fn vtx_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 @fragment
 fn frag_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let raw_val = textureSampleLevel(texture, sample, in.uv, 0.0).r;
-
-    if raw_val <= -1.0 {
+    let tex_size = vec2<f32>(textureDimensions(texture));
+    let pixel_coords = vec2<i32>(in.uv * tex_size);
+    let raw_val = textureLoad(texture, pixel_coords, 0).r;
+    if raw_val < -0.5 {
         return vec4<f32>(0.3, 0.3, 0.3, 1.0);
     }
 

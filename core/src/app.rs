@@ -124,40 +124,42 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let mut attrs = WindowAttributes::default()
-            .with_title("Diffusion Simulation Window")
-            .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64));
+        let window = event_loop
+            .create_window(
+                WindowAttributes::default()
+                    .with_title("Diffusion Simulation Window")
+                    .with_inner_size(winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64)),
+            )
+            .unwrap();
+        let window = Arc::new(window);
+        self.window = Some(window.clone());
 
         #[cfg(target_arch = "wasm32")]
         {
-            use wasm_bindgen::JsCast;
-            use winit::platform::web::WindowAttributesExtWebSys;
+            use winit::platform::web::WindowExtWebSys;
 
-            let canvas = web_sys::window()
-                .unwrap()
-                .document()
-                .unwrap()
-                .get_element_by_id("canvas")
-                .unwrap()
-                .dyn_into::<web_sys::HtmlCanvasElement>()
-                .unwrap();
+            let document = web_sys::window().unwrap().document().unwrap();
+            let body = document.body().unwrap();
+            let canvas = window.canvas().unwrap();
 
-            let style = canvas.style();
-            style
-                .set_property("width", &format!("{}px", WIDTH))
-                .unwrap();
-            style
-                .set_property("height", &format!("{}px", HEIGHT))
-                .unwrap();
+            canvas.set_id("canvas");
+
             canvas.set_width(WIDTH as u32);
             canvas.set_height(HEIGHT as u32);
 
-            attrs = attrs.with_canvas(Some(canvas));
-        };
+            canvas
+                .style()
+                .set_property("width", &format!("{}px", WIDTH))
+                .unwrap();
+            canvas
+                .style()
+                .set_property("height", &format!("{}px", HEIGHT))
+                .unwrap();
+            canvas.style().set_property("display", "block").unwrap();
+            canvas.style().set_property("cursor", "crosshair").unwrap();
 
-        let window = event_loop.create_window(attrs).unwrap();
-        let window = Arc::new(window);
-        self.window = Some(window.clone());
+            body.append_child(&canvas).unwrap();
+        };
 
         let renderer_storage = self.renderer.clone();
 

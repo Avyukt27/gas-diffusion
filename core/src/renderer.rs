@@ -53,12 +53,20 @@ impl Renderer {
         let height = size.height.max(1);
 
         let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .copied()
-            .find(|f| f.is_srgb())
-            .unwrap_or(surface_caps.formats[0]);
+        let surface_alpha_mode = if surface_caps
+            .alpha_modes
+            .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
+        {
+            wgpu::CompositeAlphaMode::PreMultiplied
+        } else if surface_caps
+            .alpha_modes
+            .contains(&wgpu::CompositeAlphaMode::PostMultiplied)
+        {
+            wgpu::CompositeAlphaMode::PostMultiplied
+        } else {
+            surface_caps.alpha_modes[0]
+        };
+        let surface_format = surface_caps.formats[0];
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -66,7 +74,7 @@ impl Renderer {
             width,
             height,
             present_mode: wgpu::PresentMode::Fifo,
-            alpha_mode: surface_caps.alpha_modes[0],
+            alpha_mode: surface_alpha_mode,
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
@@ -141,7 +149,7 @@ impl Renderer {
                 module: &shader,
                 entry_point: Some("frag_main"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
+                    format: surface_format,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -234,8 +242,8 @@ impl Renderer {
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
+                            g: 0.5,
+                            b: 1.0,
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -264,27 +272,17 @@ impl Renderer {
         sim_height: u32,
     ) {
         let bytes_per_pixel = 4;
-        let unpadded_bytes_per_row = sim_width * bytes_per_pixel;
-        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-        let padding = (align - (unpadded_bytes_per_row % align)) % align;
-        let padded_bytes_per_row = unpadded_bytes_per_row + padding;
-
-        let f32_per_row = padded_bytes_per_row / bytes_per_pixel;
-        let mut aligned_buffer = vec![0.0f32; f32_per_row as usize * sim_height as usize];
+        let mut packed_buffer = vec![0.0f32; (sim_width * sim_height) as usize];
 
         for y in 0..sim_height as usize {
             let src_start = y * sim_width as usize;
-            let dest_start = y * f32_per_row as usize;
-
             for x in 0..sim_width as usize {
                 let sim_idx = src_start + x;
-                let dest_idx = dest_start + x;
-
                 if sim_idx < concentrations.len() {
                     if walls[sim_idx] {
-                        aligned_buffer[dest_idx] = -1.0;
+                        packed_buffer[sim_idx] = -1.0;
                     } else {
-                        aligned_buffer[dest_idx] = concentrations[sim_idx] as f32;
+                        packed_buffer[sim_idx] = concentrations[sim_idx] as f32;
                     }
                 }
             }
@@ -297,10 +295,10 @@ impl Renderer {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            bytemuck::cast_slice(&aligned_buffer[..]),
+            bytemuck::cast_slice(&packed_buffer),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(padded_bytes_per_row),
+                bytes_per_row: Some(sim_width * bytes_per_pixel),
                 rows_per_image: Some(sim_height),
             },
             wgpu::Extent3d {
