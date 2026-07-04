@@ -22,7 +22,7 @@ impl Renderer {
     pub async fn new(window: &Arc<Window>) -> anyhow::Result<Self> {
         let size = window.inner_size();
 
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             #[cfg(not(target_arch = "wasm32"))]
             backends: wgpu::Backends::PRIMARY,
             #[cfg(target_arch = "wasm32")]
@@ -30,6 +30,7 @@ impl Renderer {
             flags: Default::default(),
             memory_budget_thresholds: Default::default(),
             backend_options: Default::default(),
+            display: None,
         });
 
         let surface = instance.create_surface(window.clone()).unwrap();
@@ -38,6 +39,7 @@ impl Renderer {
                 power_preference: wgpu::PowerPreference::default(),
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await?;
 
@@ -75,6 +77,7 @@ impl Renderer {
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
+            color_space: wgpu::SurfaceColorSpace::Auto,
         };
         // surface.configure(&device, &config);
         //
@@ -220,48 +223,71 @@ impl Renderer {
         })
     }
 
-    // pub fn render(&self) {
-    //     let output = self.surface.get_current_texture().unwrap();
-    //     let view = output
-    //         .texture
-    //         .create_view(&wgpu::TextureViewDescriptor::default());
-    //     let mut encoder = self
-    //         .device
-    //         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-    //             label: Some("Render Encoder"),
-    //         });
-    //
-    //     {
-    //         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-    //             label: Some("Render Pass"),
-    //             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-    //                 view: &view,
-    //                 resolve_target: None,
-    //                 ops: wgpu::Operations {
-    //                     load: wgpu::LoadOp::Clear(wgpu::Color {
-    //                         r: 0.0,
-    //                         g: 0.5,
-    //                         b: 1.0,
-    //                         a: 1.0,
-    //                     }),
-    //                     store: wgpu::StoreOp::Store,
-    //                 },
-    //                 depth_slice: None,
-    //             })],
-    //             depth_stencil_attachment: None,
-    //             occlusion_query_set: None,
-    //             timestamp_writes: None,
-    //         });
-    //
-    //         render_pass.set_pipeline(&self.pipeline);
-    //         render_pass.set_bind_group(0, &self.bind_group, &[]);
-    //         render_pass.draw(0..6, 0..1);
-    //     }
-    //
-    //     self.queue.submit(std::iter::once(encoder.finish()));
-    //     output.present();
-    // }
-    //
+    pub fn render(&mut self) -> anyhow::Result<()> {
+        let output = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(surface_texture) => surface_texture,
+            wgpu::CurrentSurfaceTexture::Suboptimal(surface_texture) => {
+                self.surface.configure(&self.device, &self.config);
+                surface_texture
+            }
+            wgpu::CurrentSurfaceTexture::Timeout
+            | wgpu::CurrentSurfaceTexture::Occluded
+            | wgpu::CurrentSurfaceTexture::Validation => {
+                return Ok(());
+            }
+            wgpu::CurrentSurfaceTexture::Outdated => {
+                self.surface.configure(&self.device, &self.config);
+                return Ok(());
+            }
+            wgpu::CurrentSurfaceTexture::Lost => {
+                anyhow::bail!("Lost device");
+            }
+        };
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
+
+        {
+            let mut _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.2,
+                            b: 0.3,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            });
+
+            // render_pass.set_pipeline(&self.pipeline);
+            // render_pass.set_bind_group(0, &self.bind_group, &[]);
+            // render_pass.draw(0..6, 0..1);
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.present(output);
+
+        Ok(())
+    }
+
+    fn update(&mut self) {}
+
     // pub fn upload_texture(
     //     &self,
     //     concentrations: &[f64],

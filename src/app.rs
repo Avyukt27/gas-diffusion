@@ -110,38 +110,7 @@ impl ApplicationHandler<State> for App {
                         ..
                     },
                 ..
-            } => {
-                match (code, key_state.is_pressed()) {
-                    //                     Key::Named(NamedKey::Space) => match self.draw_mode {
-                    //                         DrawMode::Gas => self.draw_mode = DrawMode::Source,
-                    //                         DrawMode::Source => self.draw_mode = DrawMode::Sink,
-                    //                         DrawMode::Sink => self.draw_mode = DrawMode::Advection,
-                    //                         DrawMode::Advection => self.draw_mode = DrawMode::Stopper,
-                    //                         DrawMode::Stopper => self.draw_mode = DrawMode::Gas,
-                    //                     },
-                    //                     Key::Named(NamedKey::ArrowUp) => {
-                    //                         self.draw_intensity = (self.draw_intensity + 0.25).clamp(0.0, 1.0)
-                    //                     }
-                    //                     Key::Named(NamedKey::ArrowDown) => {
-                    //                         self.draw_intensity = (self.draw_intensity - 0.25).clamp(0.0, 1.0)
-                    //                     }
-                    //                     Key::Named(NamedKey::Enter) => {
-                    //                         if self.delta != 0.0 {
-                    //                             self.delta = 0.0;
-                    //                         } else {
-                    //                             self.delta = 1.0;
-                    //                         }
-                    //                     }
-                    //                     Key::Character(ref c) if c == "c" => {
-                    //                         self.grid.concentrations.fill(0.0);
-                    //                         self.grid.sources.fill(0.0);
-                    //                         self.grid.advections.fill((0.0, 0.0));
-                    //                         self.grid.walls.fill(false);
-                    //                     }
-                    (KeyCode::Escape, true) => event_loop.exit(),
-                    _ => {}
-                }
-            }
+            } => state.handle_key(event_loop, code, key_state.is_pressed()),
             //         WindowEvent::CursorMoved { position, .. } => {
             //             self.mouse_position = position;
             //             if self.mouse_down {
