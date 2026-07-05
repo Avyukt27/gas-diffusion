@@ -1,4 +1,4 @@
-name: Deploy WebAssembly to GitHub Pages
+name: Build and Deploy WebAssembly Version to Github Pages
 
 on:
   push:
