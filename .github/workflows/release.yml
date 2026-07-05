@@ -74,6 +74,7 @@ jobs:
           mkdir -p public
           cp index.html public/
           cp -r pkg public/pkg
+          touch public/.nojekyll
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
