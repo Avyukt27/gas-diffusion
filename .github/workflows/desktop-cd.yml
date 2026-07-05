@@ -1,0 +1,56 @@
+name: Build and Release Desktop Versions
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+      - name: Build
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+      - name: Package binary
+        run: |
+          mkdir -p release
+          cp target/x86_64-unknown-linux-gnu/release/diffusion release/diffusion-linux
+          zip -j release/diffusion-linux.zip release/diffusion-linux
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/diffusion-linux.zip
+
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+      - name: Install mingw
+        run: sudo apt install -y mingw-w64
+      - name: Build
+        run: cargo build --release --target x86_64-pc-windows-gnu
+      - name: Package binary
+        run: |
+          mkdir -p release
+          cp target/x86_64-pc-windows-gnu/release/diffusion.exe release/diffusion-windows.exe
+          zip -j release/diffusion-windows.zip release/diffusion-windows.exe
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/diffusion-linux.zip

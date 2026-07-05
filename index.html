@@ -2,42 +2,35 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Diffusion Simulation</title>
     <style>
-      body {
+      * {
+        padding: 0;
         margin: 0;
-        background-color: #111;
+      }
+      html {
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
-        user-select: none;
+        width: 100%;
+        height: 100%;
       }
-
       canvas {
-        background: #000;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-        outline: none;
+        background-color: black;
         cursor: crosshair;
-        touch-action: none;
-        user-select: none;
       }
     </style>
   </head>
 
   <body>
-    <canvas id="canvas" width="640" height="640"></canvas>
-
+    <canvas id="canvas"></canvas>
     <script type="module">
-      import init, { start } from "./pkg/web.js";
-
-      async function run() {
-        await init();
-        start();
-      }
-
-      run();
+      import init from "./pkg/diffusion.js";
+      init().then(() => {
+        console.log("WASM Loaded");
+      });
     </script>
   </body>
 </html>
