@@ -54,29 +54,3 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release/diffusion-linux.zip
-
-  build-wasm:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      - name: Build
-        run: wasm-pack build --release --target web
-      - name: Prepare Website
-        run: |
-          mkdir -p public
-          cp index.html public/
-          cp -r pkg public/pkg
-          touch public/.nojekyll
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
