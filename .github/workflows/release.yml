@@ -9,38 +9,73 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  build-linux:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [x86_64-unknown-linux-gnu, x86_64-pc-windows-gnu]
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          override: true
-      - name: Install mingw
-        if: matrix.target == 'x86_64-pc-windows-gnu'
-        run: sudo apt install -y mingw-w64
-      - name: Add Rust target
-        run: rustup target add ${{ matrix.target }}
+          targets: x86_64-unknown-linux-gnu
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target x86_64-unknown-linux-gnu
       - name: Package binary
         run: |
           mkdir -p release
-          if [[ "${{ matrix.target }}" == "x86_64-pc-windows-gnu" ]]; then
-            cp target/${{ matrix.target }}/release/diffusion.exe release/diffusion-windows.exe
-            zip -j release/diffusion-windows.zip release/diffusion-windows.exe
-          elif [[ "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]]; then
-            cp target/${{ matrix.target }}/release/diffusion release/diffusion-linux
-            zip -j release/diffusion-linux.zip release/diffusion-linux
-          fi
-      - name: Create release with all artifacts
-        uses: softprops/action-gh-release@v1
+          cp target/x86_64-unknown-linux-gnu/release/diffusion release/diffusion-linux
+          zip -j release/diffusion-linux.zip release/diffusion-linux
+      - name: Release
+        uses: softprops/action-gh-release@v2
         with:
-          files: release/*.zip
+          files: release/diffusion-linux.zip
+
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+      - name: Install mingw
+        run: sudo apt install -y mingw-w64
+      - name: Build
+        run: cargo build --release --target x86_64-pc-windows-gnu
+      - name: Package binary
+        run: |
+          mkdir -p release
+          cp target/x86_64-pc-windows-gnu/release/diffusion.exe release/diffusion-windows.exe
+          zip -j release/diffusion-windows.zip release/diffusion-windows.exe
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/diffusion-linux.zip
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build
+        run: wasm-pack build --release --target web
+      - name: Prepare Website
+        run: |
+          mkdir -p public
+          cp index.html public/
+          cp -r pkg public/pkg
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public

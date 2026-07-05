@@ -1,4 +1,4 @@
-target
-web/target
-web/pkg
+/target
+/pkg
+**/*.zip
 Session.vim
