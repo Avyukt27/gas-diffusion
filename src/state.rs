@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use winit::{
     dpi::PhysicalPosition,
-    event::{ElementState, MouseButton},
+    event::{ElementState, MouseButton, MouseScrollDelta},
     event_loop::ActiveEventLoop,
     keyboard::KeyCode,
     window::Window,
@@ -204,5 +204,18 @@ impl State {
             }
         }
         self.prev_mouse_position = position;
+    }
+
+    pub fn handle_mouse_wheel(&mut self, delta: MouseScrollDelta) {
+        let scroll_y = match delta {
+            MouseScrollDelta::LineDelta(_, y) => y as f64,
+            MouseScrollDelta::PixelDelta(pos) => pos.y / 50.0,
+        };
+
+        if scroll_y > 0.0 {
+            self.draw_size += 1;
+        } else if scroll_y < 0.0 && self.draw_size > 1 {
+            self.draw_size -= 1;
+        }
     }
 }

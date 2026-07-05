@@ -126,18 +126,7 @@ impl ApplicationHandler<State> for App {
                 button,
                 ..
             } => state.handle_mouse_click(click_state, button),
-            //         WindowEvent::MouseWheel { delta, .. } => {
-            //             let scroll_y = match delta {
-            //                 MouseScrollDelta::LineDelta(_, y) => y as f64,
-            //                 MouseScrollDelta::PixelDelta(pos) => pos.y / 50.0,
-            //             };
-            //
-            //             if scroll_y > 0.0 {
-            //                 self.draw_size += 1;
-            //             } else if scroll_y < 0.0 && self.draw_size > 1 {
-            //                 self.draw_size -= 1;
-            //             }
-            //         }
+            WindowEvent::MouseWheel { delta, .. } => state.handle_mouse_wheel(delta),
             _ => {}
         }
     }
