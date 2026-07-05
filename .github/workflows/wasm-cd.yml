@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -16,6 +16,9 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,14 +35,19 @@ jobs:
       - name: Stage Public Static Folder
         run: |
           mkdir -p dist
+          if [ ! -f index.html ]; then
+            echo "ERROR: index.html missing from root!"
+            exit 1
+          fi
+          cp index.html dist/
           cp -r pkg dist/
-          cp index.html dist/ || true
           touch dist/.nojekyll
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
       - name: Deploy
+        id: deployment
         uses: actions/deploy-pages@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
