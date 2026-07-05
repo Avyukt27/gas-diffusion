@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use wgpu::Limits;
 use winit::window::Window;
 
 use crate::state::{CELL_SIZE, HEIGHT, WIDTH};
@@ -26,7 +27,7 @@ impl Renderer {
             #[cfg(not(target_arch = "wasm32"))]
             backends: wgpu::Backends::PRIMARY,
             #[cfg(target_arch = "wasm32")]
-            backends: wgpu::Backends::GL,
+            backends: wgpu::Backends::BROWSER_WEBGPU,
             flags: Default::default(),
             memory_budget_thresholds: Default::default(),
             backend_options: Default::default(),
@@ -48,11 +49,7 @@ impl Renderer {
                 label: Some("Simulation Device"),
                 required_features: wgpu::Features::empty(),
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                required_limits: if cfg!(target_arch = "wasm32") {
-                    wgpu::Limits::downlevel_webgl2_defaults()
-                } else {
-                    wgpu::Limits::default()
-                },
+                required_limits: Limits::default(),
                 memory_hints: Default::default(),
                 trace: wgpu::Trace::Off,
             })
@@ -273,6 +270,7 @@ impl Renderer {
 
         self.queue.submit(std::iter::once(encoder.finish()));
         self.queue.present(output);
+        drop(view);
 
         Ok(())
     }
@@ -323,7 +321,7 @@ impl Renderer {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        if width > 0 && height > 0 {
+        if width > 0 && height > 0 && (self.config.width != width || self.config.height != height) {
             self.config.width = width.min(2048);
             self.config.height = height.min(2048);
             self.surface.configure(&self.device, &self.config);

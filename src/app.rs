@@ -6,7 +6,7 @@ use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
     event::{KeyEvent, WindowEvent},
-    keyboard::{KeyCode, PhysicalKey},
+    keyboard::PhysicalKey,
     window::Window,
 };
 

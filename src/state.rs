@@ -30,13 +30,6 @@ pub struct State {
     pub renderer: Renderer,
     pub grid: Grid,
 
-    #[cfg(target_arch = "wasm32")]
-    pub last_frame_time: f64,
-    #[cfg(target_arch = "wasm32")]
-    pub frame_count: u32,
-    #[cfg(target_arch = "wasm32")]
-    pub fps_timer: f64,
-
     pub draw_mode: DrawMode,
     pub draw_size: usize,
     pub draw_intensity: f64,
@@ -52,13 +45,6 @@ impl State {
             delta: 1.0,
             renderer,
             grid: Grid::new(WIDTH, HEIGHT, CELL_SIZE),
-
-            #[cfg(target_arch = "wasm32")]
-            last_frame_time: 0.0,
-            #[cfg(target_arch = "wasm32")]
-            frame_count: 0,
-            #[cfg(target_arch = "wasm32")]
-            fps_timer: 0.0,
 
             draw_mode: DrawMode::Gas,
             draw_size: 1,
