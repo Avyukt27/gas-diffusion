@@ -4,13 +4,16 @@ use std::sync::Arc;
 use winit::event_loop::{EventLoop, EventLoopProxy};
 use winit::{
     application::ApplicationHandler,
+    dpi::LogicalSize,
     event::{KeyEvent, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
     window::Window,
 };
 
-use crate::renderer::Renderer;
-use crate::state::State;
+use crate::{
+    renderer::Renderer,
+    state::{HEIGHT, State, WIDTH},
+};
 
 pub struct App {
     #[cfg(target_arch = "wasm32")]
@@ -33,8 +36,9 @@ impl App {
 impl ApplicationHandler<State> for App {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         #[allow(unused_mut)]
-        let mut window_attributes =
-            Window::default_attributes().with_title("Diffusion Simulation Window");
+        let mut window_attributes = Window::default_attributes()
+            .with_title("Diffusion Simulation Window")
+            .with_inner_size(LogicalSize::new(WIDTH as f64, HEIGHT as f64));
 
         #[cfg(target_arch = "wasm32")]
         {
@@ -53,7 +57,12 @@ impl ApplicationHandler<State> for App {
         #[cfg(not(target_arch = "wasm32"))]
         {
             let renderer = pollster::block_on(Renderer::new(&window)).unwrap();
-            self.state = Some(pollster::block_on(State::new(window, renderer)).unwrap());
+            let mut state = pollster::block_on(State::new(window.clone(), renderer)).unwrap();
+
+            let initial_size = window.inner_size();
+            state.resize(initial_size.width, initial_size.height);
+
+            self.state = Some(state);
         }
 
         #[cfg(target_arch = "wasm32")]
@@ -100,7 +109,7 @@ impl ApplicationHandler<State> for App {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => state.resize(size.width, size.height),
             WindowEvent::RedrawRequested => {
-                state.render();
+                let _ = state.render();
             }
             WindowEvent::KeyboardInput {
                 event:
@@ -111,52 +120,12 @@ impl ApplicationHandler<State> for App {
                     },
                 ..
             } => state.handle_key(event_loop, code, key_state.is_pressed()),
-            //         WindowEvent::CursorMoved { position, .. } => {
-            //             self.mouse_position = position;
-            //             if self.mouse_down {
-            //                 let cell_x = self.mouse_position.x as usize / self.grid.cell_size;
-            //                 let cell_y = self.mouse_position.y as usize / self.grid.cell_size;
-            //
-            //                 let prev_cell_x = self.prev_mouse_position.x as usize / self.grid.cell_size;
-            //                 let prev_cell_y = self.prev_mouse_position.y as usize / self.grid.cell_size;
-            //
-            //                 if cell_x < self.grid.width
-            //                     && cell_y < self.grid.height
-            //                     && prev_cell_x < self.grid.width
-            //                     && prev_cell_y < self.grid.height
-            //                 {
-            //                     self.apply_brush(
-            //                         cell_x,
-            //                         cell_y,
-            //                         prev_cell_x,
-            //                         prev_cell_y,
-            //                         self.draw_size,
-            //                         self.draw_size,
-            //                     );
-            //                 }
-            //             }
-            //             self.prev_mouse_position = position;
-            //         }
-            //         WindowEvent::MouseInput { state, button, .. } => {
-            //             if button == MouseButton::Left {
-            //                 self.mouse_down = state.is_pressed();
-            //                 if self.mouse_down {
-            //                     let cell_x = self.mouse_position.x as usize / self.grid.cell_size;
-            //                     let cell_y = self.mouse_position.y as usize / self.grid.cell_size;
-            //
-            //                     if cell_x < self.grid.width && cell_y < self.grid.height {
-            //                         self.apply_brush(
-            //                             cell_x,
-            //                             cell_y,
-            //                             cell_x,
-            //                             cell_y,
-            //                             self.draw_size,
-            //                             self.draw_size,
-            //                         );
-            //                     }
-            //                 }
-            //             }
-            //         }
+            WindowEvent::CursorMoved { position, .. } => state.handle_mouse_move(position),
+            WindowEvent::MouseInput {
+                state: click_state,
+                button,
+                ..
+            } => state.handle_mouse_click(click_state, button),
             //         WindowEvent::MouseWheel { delta, .. } => {
             //             let scroll_y = match delta {
             //                 MouseScrollDelta::LineDelta(_, y) => y as f64,

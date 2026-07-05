@@ -12,7 +12,7 @@ struct ColourStop {
 @group(0) @binding(1) var sample: sampler;
 
 @vertex
-fn vtx_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var positions = array<vec2<f32>, 6>(
         vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0),
         vec2(-1.0, 1.0), vec2(1.0, -1.0), vec2(1.0, 1.0),
@@ -32,7 +32,7 @@ fn vtx_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 }
 
 @fragment
-fn frag_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tex_size = vec2<f32>(textureDimensions(texture));
     let pixel_coords = vec2<i32>(in.uv * tex_size);
     let raw_val = textureLoad(texture, pixel_coords, 0).r;

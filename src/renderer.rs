@@ -1,21 +1,21 @@
 use std::sync::Arc;
 use winit::window::Window;
 
+use crate::state::{CELL_SIZE, HEIGHT, WIDTH};
+
 pub struct Renderer {
-    // pub width: u32,
-    // pub height: u32,
-    // pub cell_size: u32,
-    //
     pub surface: wgpu::Surface<'static>,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
-    //
-    // pub bind_group_layout: wgpu::BindGroupLayout,
-    // pub bind_group: wgpu::BindGroup,
-    // pub texture: wgpu::Texture,
-    //
+
+    pub bind_group_layout: wgpu::BindGroupLayout,
+    pub bind_group: wgpu::BindGroup,
+    pub texture: wgpu::Texture,
+
     pub render_pipeline: wgpu::RenderPipeline,
+
+    pub is_surface_configured: bool,
 }
 
 impl Renderer {
@@ -42,8 +42,6 @@ impl Renderer {
                 apply_limit_buckets: false,
             })
             .await?;
-
-        let info = adapter.get_info();
 
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
@@ -79,62 +77,61 @@ impl Renderer {
             desired_maximum_frame_latency: 2,
             color_space: wgpu::SurfaceColorSpace::Auto,
         };
-        // surface.configure(&device, &config);
-        //
-        // let grid_width = width / cell_size;
-        // let grid_height = height / cell_size;
-        //
-        // let texture_descriptor = wgpu::TextureDescriptor {
-        //     size: wgpu::Extent3d {
-        //         width: grid_width.max(1),
-        //         height: grid_height.max(1),
-        //         depth_or_array_layers: 1,
-        //     },
-        //     mip_level_count: 1,
-        //     sample_count: 1,
-        //     dimension: wgpu::TextureDimension::D2,
-        //     format: wgpu::TextureFormat::R32Float,
-        //     usage: wgpu::TextureUsages::TEXTURE_BINDING
-        //         | wgpu::TextureUsages::COPY_DST
-        //         | wgpu::TextureUsages::RENDER_ATTACHMENT,
-        //     label: Some("Simulation Texture"),
-        //     view_formats: &[],
-        // };
-        //
-        // let texture = device.create_texture(&texture_descriptor);
-        // let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let grid_width = (WIDTH / CELL_SIZE) as u32;
+        let grid_height = (HEIGHT / CELL_SIZE) as u32;
+
+        let texture_descriptor = wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: grid_width.max(1),
+                height: grid_height.max(1),
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R32Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            label: Some("Simulation Texture"),
+            view_formats: &[],
+        };
+
+        let texture = device.create_texture(&texture_descriptor);
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("test_shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
-        // let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        //     entries: &[
-        //         wgpu::BindGroupLayoutEntry {
-        //             binding: 0,
-        //             visibility: wgpu::ShaderStages::FRAGMENT,
-        //             ty: wgpu::BindingType::Texture {
-        //                 multisampled: false,
-        //                 view_dimension: wgpu::TextureViewDimension::D2,
-        //                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
-        //             },
-        //             count: None,
-        //         },
-        //         wgpu::BindGroupLayoutEntry {
-        //             binding: 1,
-        //             visibility: wgpu::ShaderStages::FRAGMENT,
-        //             ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-        //             count: None,
-        //         },
-        //     ],
-        //     label: Some("Simulation Bind Group Layout"),
-        // });
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
+            ],
+            label: Some("Simulation Bind Group Layout"),
+        });
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[],
+                bind_group_layouts: &[Some(&bind_group_layout)],
                 immediate_size: 0,
             });
 
@@ -176,55 +173,48 @@ impl Renderer {
             cache: None,
         });
 
-        // let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-        //     address_mode_u: wgpu::AddressMode::ClampToEdge,
-        //     address_mode_v: wgpu::AddressMode::ClampToEdge,
-        //     mag_filter: wgpu::FilterMode::Nearest,
-        //     min_filter: wgpu::FilterMode::Nearest,
-        //     mipmap_filter: wgpu::FilterMode::Nearest,
-        //     ..Default::default()
-        // });
-        //
-        // let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        //     layout: &bind_group_layout,
-        //     entries: &[
-        //         wgpu::BindGroupEntry {
-        //             binding: 0,
-        //             resource: wgpu::BindingResource::TextureView(&texture_view),
-        //         },
-        //         wgpu::BindGroupEntry {
-        //             binding: 1,
-        //             resource: wgpu::BindingResource::Sampler(&sampler),
-        //         },
-        //     ],
-        //     label: Some("Simulation Bind Group"),
-        // });
-        //
-        // #[cfg(target_arch = "wasm32")]
-        // web_sys::console::log_1(
-        //     &format!(
-        //         "wgpu Backend Active: {:?} | Driver: {} | Device: {}\nWidth: {}\nHeight: {}",
-        //         info.backend, info.driver, info.name, width, height
-        //     )
-        //     .into(),
-        // );
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+            label: Some("Simulation Bind Group"),
+        });
 
         Ok(Self {
-            // width,
-            // height,
-            // cell_size,
             surface,
             device,
             queue,
             config,
-            // bind_group_layout,
-            // bind_group,
-            // texture,
+            bind_group_layout,
+            bind_group,
+            texture,
             render_pipeline,
+            is_surface_configured: false,
         })
     }
 
     pub fn render(&mut self) -> anyhow::Result<()> {
+        if !self.is_surface_configured {
+            return Ok(());
+        }
+
         let output = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(surface_texture) => surface_texture,
             wgpu::CurrentSurfaceTexture::Suboptimal(surface_texture) => {
@@ -277,8 +267,8 @@ impl Renderer {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            // render_pass.set_bind_group(0, &self.bind_group, &[]);
-            render_pass.draw(0..3, 0..1);
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
+            render_pass.draw(0..6, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -287,110 +277,106 @@ impl Renderer {
         Ok(())
     }
 
-    fn update(&mut self) {}
+    pub fn upload_texture(
+        &self,
+        concentrations: &[f64],
+        walls: &[bool],
+        sim_width: u32,
+        sim_height: u32,
+    ) {
+        let bytes_per_pixel = 4;
+        let mut packed_buffer = vec![0.0f32; (sim_width * sim_height) as usize];
 
-    // pub fn upload_texture(
-    //     &self,
-    //     concentrations: &[f64],
-    //     walls: &[bool],
-    //     sim_width: u32,
-    //     sim_height: u32,
-    // ) {
-    //     let bytes_per_pixel = 4;
-    //     let mut packed_buffer = vec![0.0f32; (sim_width * sim_height) as usize];
-    //
-    //     for y in 0..sim_height as usize {
-    //         let src_start = y * sim_width as usize;
-    //         for x in 0..sim_width as usize {
-    //             let sim_idx = src_start + x;
-    //             if sim_idx < concentrations.len() {
-    //                 if walls[sim_idx] {
-    //                     packed_buffer[sim_idx] = -1.0;
-    //                 } else {
-    //                     packed_buffer[sim_idx] = concentrations[sim_idx] as f32;
-    //                 }
-    //             }
-    //         }
-    //     }
-    //
-    //     self.queue.write_texture(
-    //         wgpu::TexelCopyTextureInfo {
-    //             texture: &self.texture,
-    //             mip_level: 0,
-    //             origin: wgpu::Origin3d::ZERO,
-    //             aspect: wgpu::TextureAspect::All,
-    //         },
-    //         bytemuck::cast_slice(&packed_buffer),
-    //         wgpu::TexelCopyBufferLayout {
-    //             offset: 0,
-    //             bytes_per_row: Some(sim_width * bytes_per_pixel),
-    //             rows_per_image: Some(sim_height),
-    //         },
-    //         wgpu::Extent3d {
-    //             width: sim_width,
-    //             height: sim_height,
-    //             depth_or_array_layers: 1,
-    //         },
-    //     );
-    // }
-    //
+        for y in 0..sim_height as usize {
+            let src_start = y * sim_width as usize;
+            for x in 0..sim_width as usize {
+                let sim_idx = src_start + x;
+                if sim_idx < concentrations.len() {
+                    if walls[sim_idx] {
+                        packed_buffer[sim_idx] = -1.0;
+                    } else {
+                        packed_buffer[sim_idx] = concentrations[sim_idx] as f32;
+                    }
+                }
+            }
+        }
+
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            bytemuck::cast_slice(&packed_buffer),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(sim_width * bytes_per_pixel),
+                rows_per_image: Some(sim_height),
+            },
+            wgpu::Extent3d {
+                width: sim_width,
+                height: sim_height,
+                depth_or_array_layers: 1,
+            },
+        );
+    }
+
     pub fn resize(&mut self, width: u32, height: u32) {
         if width > 0 && height > 0 {
-            // self.width = width;
-            //         self.height = height;
-            //
             self.config.width = width.min(2048);
             self.config.height = height.min(2048);
             self.surface.configure(&self.device, &self.config);
-            //
-            //         let grid_width = (width / self.cell_size).max(1);
-            //         let grid_height = (height / self.cell_size).max(1);
-            //
-            //         let texture_descriptor = wgpu::TextureDescriptor {
-            //             size: wgpu::Extent3d {
-            //                 width: grid_width,
-            //                 height: grid_height,
-            //                 depth_or_array_layers: 1,
-            //             },
-            //             mip_level_count: 1,
-            //             sample_count: 1,
-            //             dimension: wgpu::TextureDimension::D2,
-            //             format: wgpu::TextureFormat::R32Float,
-            //             usage: wgpu::TextureUsages::TEXTURE_BINDING
-            //                 | wgpu::TextureUsages::COPY_DST
-            //                 | wgpu::TextureUsages::RENDER_ATTACHMENT,
-            //             label: Some("Simulation Texture (Resized)"),
-            //             view_formats: &[],
-            //         };
-            //
-            //         self.texture = self.device.create_texture(&texture_descriptor);
-            //         let texture_view = self
-            //             .texture
-            //             .create_view(&wgpu::TextureViewDescriptor::default());
-            //
-            //         let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-            //             address_mode_u: wgpu::AddressMode::ClampToEdge,
-            //             address_mode_v: wgpu::AddressMode::ClampToEdge,
-            //             mag_filter: wgpu::FilterMode::Nearest,
-            //             min_filter: wgpu::FilterMode::Nearest,
-            //             mipmap_filter: wgpu::FilterMode::Nearest,
-            //             ..Default::default()
-            //         });
-            //
-            //         self.bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            //             layout: &self.bind_group_layout,
-            //             entries: &[
-            //                 wgpu::BindGroupEntry {
-            //                     binding: 0,
-            //                     resource: wgpu::BindingResource::TextureView(&texture_view),
-            //                 },
-            //                 wgpu::BindGroupEntry {
-            //                     binding: 1,
-            //                     resource: wgpu::BindingResource::Sampler(&sampler),
-            //                 },
-            //             ],
-            //             label: Some("Simulation Bind Group (Resized)"),
-            //         });
+            self.is_surface_configured = true;
+
+            let grid_width = self.config.width / CELL_SIZE as u32;
+            let grid_height = self.config.height / CELL_SIZE as u32;
+
+            let texture_descriptor = wgpu::TextureDescriptor {
+                size: wgpu::Extent3d {
+                    width: grid_width,
+                    height: grid_height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::R32Float,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_DST
+                    | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                label: Some("Simulation Texture (Resized)"),
+                view_formats: &[],
+            };
+
+            self.texture = self.device.create_texture(&texture_descriptor);
+            let texture_view = self
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+
+            let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Nearest,
+                min_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+                ..Default::default()
+            });
+
+            self.bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &self.bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&sampler),
+                    },
+                ],
+                label: Some("Simulation Bind Group (Resized)"),
+            });
         }
     }
 }

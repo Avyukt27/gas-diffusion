@@ -1,19 +1,18 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use winit::{
-    application::ApplicationHandler,
     dpi::PhysicalPosition,
-    event::{KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
+    event::{ElementState, MouseButton},
     event_loop::ActiveEventLoop,
-    keyboard::{Key, KeyCode, NamedKey},
-    window::{Window, WindowAttributes},
+    keyboard::KeyCode,
+    window::Window,
 };
 
 use crate::{grid::Grid, renderer::Renderer};
 
-const WIDTH: usize = 640;
-const HEIGHT: usize = 480;
-const CELL_SIZE: usize = 10;
+pub const WIDTH: usize = 800;
+pub const HEIGHT: usize = 600;
+pub const CELL_SIZE: usize = 10;
 const DIFFUSION: f64 = 2.0;
 
 #[derive(PartialEq, Eq, Debug)]
@@ -122,89 +121,102 @@ impl State {
         }
     }
 
-    // pub fn create_canvas(&mut self) {
-    //     let renderer_storage = self.renderer.clone();
-    //
-    //     #[cfg(not(target_arch = "wasm32"))]
-    //     {
-    //         let renderer = pollster::block_on(Renderer::new(&self.window, CELL_SIZE as u32));
-    //         *renderer_storage.lock().unwrap() = Some(renderer);
-    //     }
-    //
-    //     #[cfg(target_arch = "wasm32")]
-    //     {
-    //         let window_clone = self.window.clone();
-    //         wasm_bindgen_futures::spawn_local(async move {
-    //             let renderer = Renderer::new(&window_clone, CELL_SIZE as u32).await;
-    //             let scale_factor = window_clone.scale_factor();
-    //             let physical_size = winit::dpi::LogicalSize::new(WIDTH as f64, HEIGHT as f64)
-    //                 .to_physical::<u32>(scale_factor);
-    //             let mut renderer_lock = renderer_storage.lock().unwrap();
-    //             *renderer_lock = Some(renderer);
-    //             if let Some(ref mut r) = *renderer_lock {
-    //                 r.resize(physical_size.width, physical_size.height);
-    //             }
-    //
-    //             window_clone.request_redraw();
-    //         })
-    //     }
-    // }
-
     pub fn resize(&mut self, width: u32, height: u32) {
         self.renderer.resize(width, height);
     }
 
     pub fn render(&mut self) -> anyhow::Result<()> {
-        //             if let Ok(mut guard) = self.renderer.lock() {
-        //                 if let Some(ref mut renderer) = *guard {
-        //                     self.grid.update(DIFFUSION, self.delta);
-        //                     renderer.upload_texture(
-        //                         &self.grid.concentrations,
-        //                         &self.grid.walls,
-        //                         self.grid.width as u32,
-        //                         self.grid.height as u32,
-        //                     );
-        //                     renderer.render();
-        //                     #[cfg(target_arch = "wasm32")]
-        //                     self.window.request_redraw();
-        //                 }
-        //             }
-        //             #[cfg(not(target_arch = "wasm32"))]
         self.window.request_redraw();
-        self.renderer.render()?;
-        Ok(())
+        self.grid.update(DIFFUSION, self.delta);
+        self.renderer.upload_texture(
+            &self.grid.concentrations,
+            &self.grid.walls,
+            self.grid.width as u32,
+            self.grid.height as u32,
+        );
+        self.renderer.render()
     }
 
-    pub fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
+    pub fn handle_key(&mut self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
         match (code, is_pressed) {
-            //                     Key::Named(NamedKey::Space) => match self.draw_mode {
-            //                         DrawMode::Gas => self.draw_mode = DrawMode::Source,
-            //                         DrawMode::Source => self.draw_mode = DrawMode::Sink,
-            //                         DrawMode::Sink => self.draw_mode = DrawMode::Advection,
-            //                         DrawMode::Advection => self.draw_mode = DrawMode::Stopper,
-            //                         DrawMode::Stopper => self.draw_mode = DrawMode::Gas,
-            //                     },
-            //                     Key::Named(NamedKey::ArrowUp) => {
-            //                         self.draw_intensity = (self.draw_intensity + 0.25).clamp(0.0, 1.0)
-            //                     }
-            //                     Key::Named(NamedKey::ArrowDown) => {
-            //                         self.draw_intensity = (self.draw_intensity - 0.25).clamp(0.0, 1.0)
-            //                     }
-            //                     Key::Named(NamedKey::Enter) => {
-            //                         if self.delta != 0.0 {
-            //                             self.delta = 0.0;
-            //                         } else {
-            //                             self.delta = 1.0;
-            //                         }
-            //                     }
-            //                     Key::Character(ref c) if c == "c" => {
-            //                         self.grid.concentrations.fill(0.0);
-            //                         self.grid.sources.fill(0.0);
-            //                         self.grid.advections.fill((0.0, 0.0));
-            //                         self.grid.walls.fill(false);
-            //                     }
+            (KeyCode::Space, true) => match self.draw_mode {
+                DrawMode::Gas => self.draw_mode = DrawMode::Source,
+                DrawMode::Source => self.draw_mode = DrawMode::Sink,
+                DrawMode::Sink => self.draw_mode = DrawMode::Advection,
+                DrawMode::Advection => self.draw_mode = DrawMode::Stopper,
+                DrawMode::Stopper => self.draw_mode = DrawMode::Gas,
+            },
+            (KeyCode::ArrowUp, true) => {
+                self.draw_intensity = (self.draw_intensity + 0.25).clamp(0.0, 1.0)
+            }
+            (KeyCode::ArrowDown, true) => {
+                self.draw_intensity = (self.draw_intensity - 0.25).clamp(0.0, 1.0)
+            }
+            (KeyCode::Enter, true) => {
+                if self.delta != 0.0 {
+                    self.delta = 0.0;
+                } else {
+                    self.delta = 1.0;
+                }
+            }
+            (KeyCode::KeyC, true) => {
+                self.grid.concentrations.fill(0.0);
+                self.grid.sources.fill(0.0);
+                self.grid.advections.fill((0.0, 0.0));
+                self.grid.walls.fill(false);
+            }
             (KeyCode::Escape, true) => event_loop.exit(),
             _ => {}
         }
+    }
+
+    pub fn handle_mouse_click(&mut self, state: ElementState, button: MouseButton) {
+        match (button, state) {
+            (MouseButton::Left, ElementState::Pressed) => {
+                self.mouse_down = state.is_pressed();
+                let cell_x = self.mouse_position.x as usize / self.grid.cell_size;
+                let cell_y = self.mouse_position.y as usize / self.grid.cell_size;
+
+                if cell_x < self.grid.width && cell_y < self.grid.height {
+                    self.apply_brush(
+                        cell_x,
+                        cell_y,
+                        cell_x,
+                        cell_y,
+                        self.draw_size,
+                        self.draw_size,
+                    );
+                }
+            }
+            (MouseButton::Left, ElementState::Released) => self.mouse_down = state.is_pressed(),
+            _ => {}
+        }
+    }
+
+    pub fn handle_mouse_move(&mut self, position: PhysicalPosition<f64>) {
+        self.mouse_position = position;
+        if self.mouse_down {
+            let cell_x = self.mouse_position.x as usize / self.grid.cell_size;
+            let cell_y = self.mouse_position.y as usize / self.grid.cell_size;
+
+            let prev_cell_x = self.prev_mouse_position.x as usize / self.grid.cell_size;
+            let prev_cell_y = self.prev_mouse_position.y as usize / self.grid.cell_size;
+
+            if cell_x < self.grid.width
+                && cell_y < self.grid.height
+                && prev_cell_x < self.grid.width
+                && prev_cell_y < self.grid.height
+            {
+                self.apply_brush(
+                    cell_x,
+                    cell_y,
+                    prev_cell_x,
+                    prev_cell_y,
+                    self.draw_size,
+                    self.draw_size,
+                );
+            }
+        }
+        self.prev_mouse_position = position;
     }
 }
