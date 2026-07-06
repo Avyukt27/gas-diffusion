@@ -38,7 +38,8 @@ impl ApplicationHandler<State> for App {
         #[allow(unused_mut)]
         let mut window_attributes = Window::default_attributes()
             .with_title("Diffusion Simulation Window")
-            .with_inner_size(LogicalSize::new(WIDTH as f64, HEIGHT as f64));
+            .with_inner_size(LogicalSize::new(WIDTH as f64, HEIGHT as f64))
+            .with_resizable(false);
 
         #[cfg(target_arch = "wasm32")]
         {

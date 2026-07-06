@@ -321,7 +321,7 @@ impl Renderer {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        if width > 0 && height > 0 && (self.config.width != width || self.config.height != height) {
+        if width > 0 && height > 0 {
             self.config.width = width.min(2048);
             self.config.height = height.min(2048);
             self.surface.configure(&self.device, &self.config);
