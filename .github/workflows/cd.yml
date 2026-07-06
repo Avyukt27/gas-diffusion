@@ -97,6 +97,7 @@ jobs:
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          name: release-artifact-wasm
           path: ./dist
 
   deploy-pages:
@@ -109,6 +110,8 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: release-artifact-wasm
 
   publish-release:
     needs: [build-linux, build-windows]
