@@ -11,7 +11,7 @@ opt-level = 0
 debug-assertions = true
 
 [lib]
-crate-type = ["rlib"]
+crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 anyhow = "1.0.103"

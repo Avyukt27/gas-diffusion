@@ -39,22 +39,24 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install wasm-bindgen-cli (WASM Only)
+      - name: Install wasm-pack (WASM Only)
         if: matrix.platform == 'wasm'
-        run: cargo install wasm-bindgen-cli
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'latest'
 
       - name: Build WebAssembly Target
         if: matrix.platform == 'wasm'
-        run: |
-          cargo rustc --target ${{ matrix.target }} --release -- --crate-type=cdylib
-          wasm-bindgen --target web --out-dir pkg ./target/wasm32-unknown-unknown/release/diffusion.wasm
+        run: wasm-pack build --target web --out-dir pkg
 
       - name: Build Linux Target
         if: matrix.platform == 'linux'
-        run: cargo rustc --target ${{ matrix.target }} --release -- --crate-type=cdylib
+        run: cargo build --target ${{ matrix.target }} --release
 
       - name: Build Windows Target
         if: matrix.platform == 'windows'
+        env:
+          RUSTFLAGS: "-C link-arg=-Wl,--exclude-all-symbols"
         run: cargo build --target ${{ matrix.target }} --release
 
       - name: Stage Public Static Folder (WASM Only)
@@ -85,4 +87,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/uses: actions/deploy-pages@v4
