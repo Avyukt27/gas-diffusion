@@ -5,6 +5,8 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use winit::event_loop::EventLoop;
 
 pub mod app;
+pub mod cpu_grid;
+pub mod gpu_grid;
 pub mod grid;
 pub mod renderer;
 pub mod state;

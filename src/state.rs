@@ -8,10 +8,7 @@ use winit::{
     window::Window,
 };
 
-use crate::{
-    grid::{CpuGrid, Grid},
-    renderer::Renderer,
-};
+use crate::{cpu_grid::CpuGrid, grid::Grid, renderer::Renderer};
 
 pub const WIDTH: usize = 800;
 pub const HEIGHT: usize = 600;
