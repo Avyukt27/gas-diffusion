@@ -278,7 +278,7 @@ impl Renderer {
     pub fn upload_texture(
         &self,
         concentrations: &[f64],
-        walls: &[bool],
+        walls: &[u8],
         sim_width: u32,
         sim_height: u32,
     ) {
@@ -290,7 +290,7 @@ impl Renderer {
             for x in 0..sim_width as usize {
                 let sim_idx = src_start + x;
                 if sim_idx < concentrations.len() {
-                    if walls[sim_idx] {
+                    if walls[sim_idx] == 1 {
                         packed_buffer[sim_idx] = -1.0;
                     } else {
                         packed_buffer[sim_idx] = concentrations[sim_idx] as f32;

@@ -1,14 +1,45 @@
-pub struct Grid {
-    pub width: usize,
-    pub height: usize,
-    pub cell_size: usize,
-    pub concentrations: Vec<f64>,
-    pub sources: Vec<f64>,
-    pub advections: Vec<(f64, f64)>,
-    pub walls: Vec<bool>,
+pub trait Grid {
+    fn width(&self) -> usize;
+    fn height(&self) -> usize;
+    fn cell_size(&self) -> usize;
+    fn draw_mode(&self) -> &DrawMode;
+    fn draw_intensity(&self) -> f64;
+    fn concentrations(&self) -> &[f64];
+    fn walls(&self) -> &[u8];
+
+    fn set_draw_mode(&mut self);
+    fn set_draw_intensity(&mut self, intensity: f64);
+
+    fn update(&mut self, diffusion_coefficient: f64, delta: f64);
+    fn inject(
+        &mut self,
+        start_x: usize,
+        start_y: usize,
+        prev_cell_x: usize,
+        prev_cell_y: usize,
+        delta: f64,
+    );
+
+    fn clear(&mut self);
 }
 
-impl Grid {
+pub struct CpuGrid {
+    width: usize,
+    height: usize,
+    cell_size: usize,
+    draw_mode: DrawMode,
+    draw_intensity: f64,
+    concentrations: Vec<f64>,
+    concentrations_scratch: Vec<f64>,
+    sources: Vec<f64>,
+    advections: Vec<(f64, f64)>,
+    advections_scratch: Vec<(f64, f64)>,
+    walls: Vec<u8>,
+    pressures: Vec<f64>,
+    divergences: Vec<f64>,
+}
+
+impl CpuGrid {
     pub fn new(width: usize, height: usize, cell_size: usize) -> Self {
         let grid_width = width / cell_size;
         let grid_height = height / cell_size;
@@ -17,59 +48,18 @@ impl Grid {
             width: grid_width,
             height: grid_height,
             cell_size,
+            draw_mode: DrawMode::Gas,
+            draw_intensity: 1.0,
+
             concentrations: vec![0.0; grid_width * grid_height],
+            concentrations_scratch: vec![0.0; grid_width * grid_height],
             sources: vec![0.0; grid_width * grid_height],
             advections: vec![(0.0, 0.0); grid_width * grid_height],
-            walls: vec![false; grid_width * grid_height],
+            advections_scratch: vec![(0.0, 0.0); grid_width * grid_height],
+            walls: vec![0; grid_width * grid_height],
+            pressures: vec![0.0; grid_width * grid_height],
+            divergences: vec![0.0; grid_width * grid_height],
         }
-    }
-
-    pub fn update(&mut self, diffusion_coefficient: f64, delta: f64) {
-        self.project();
-        let mut next = self.concentrations.clone();
-        let advections = self.get_advections(delta);
-
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let idx = y * self.width + x;
-                if self.walls[idx] {
-                    next[idx] = 0.0;
-                    continue;
-                }
-                let source_rate = self.sources[idx];
-                let advection = advections[idx];
-
-                let neighbors = self.get_neighbors(idx, &advections);
-                let mut neighbor_sum = 0.0;
-                let mut fluid_count = 0.0;
-
-                for neighbor in neighbors.iter() {
-                    if let Some((value, idx)) = neighbor {
-                        if !self.walls[*idx] {
-                            neighbor_sum += value;
-                        } else {
-                            neighbor_sum += advection;
-                        }
-                        fluid_count += 1.0;
-                    }
-                }
-
-                let computed_concentration = advection
-                    + diffusion_coefficient * delta * (neighbor_sum - fluid_count * advection)
-                        / (self.cell_size * self.cell_size) as f64
-                    + source_rate;
-
-                if computed_concentration > 1.0 {
-                    next[idx] = 1.0;
-                } else if computed_concentration < 1e-4 {
-                    next[idx] = 0.0;
-                } else {
-                    next[idx] = computed_concentration;
-                }
-            }
-        }
-
-        self.concentrations = next;
     }
 
     fn get_value_change(
@@ -111,7 +101,7 @@ impl Grid {
             for x in 0..self.width {
                 let idx = y * self.width + x;
 
-                if self.walls[idx] {
+                if self.walls[idx] == 1 {
                     forward_advections[idx] = self.concentrations[idx];
                     continue;
                 }
@@ -142,7 +132,7 @@ impl Grid {
             for x in 0..self.width {
                 let idx = y * self.width + x;
 
-                if self.walls[idx] {
+                if self.walls[idx] == 1 {
                     backward_advections[idx] = self.concentrations[idx];
                     continue;
                 }
@@ -226,12 +216,12 @@ impl Grid {
                 let u = self.advections[idx].0;
                 let v = self.advections[idx].1;
 
-                let u_left = if !self.walls[y * self.width + (x - 1)] {
+                let u_left = if self.walls[y * self.width + (x - 1)] == 0 {
                     self.advections[y * self.width + (x - 1)].0
                 } else {
                     0.0
                 };
-                let v_up = if !self.walls[(y - 1) * self.width + x] {
+                let v_up = if self.walls[(y - 1) * self.width + x] == 0 {
                     self.advections[(y - 1) * self.width + x].1
                 } else {
                     0.0
@@ -249,7 +239,7 @@ impl Grid {
                 let row = y * self.width;
                 for x in 0..self.width {
                     let idx = row + x;
-                    if self.walls[idx] {
+                    if self.walls[idx] == 1 {
                         continue;
                     }
                     let neighbors = self.get_neighbors(idx, &pressures);
@@ -259,7 +249,7 @@ impl Grid {
 
                     for neighbor in neighbors.iter() {
                         if let Some((value, idx)) = neighbor {
-                            if !self.walls[*idx] {
+                            if self.walls[*idx] == 0 {
                                 neighbor_sum += value;
                             }
                             fluid_count += 1.0;
@@ -278,7 +268,7 @@ impl Grid {
                 let idx = y * self.width + x;
                 if x < self.width - 1 {
                     let right = y * self.width + (x + 1);
-                    if !self.walls[right] {
+                    if self.walls[right] == 0 {
                         self.advections[idx].0 -=
                             (pressures[right] - pressures[idx]) / self.cell_size as f64;
                     } else {
@@ -287,7 +277,7 @@ impl Grid {
                 }
                 if y < self.height - 1 {
                     let down = (y + 1) * self.width + x;
-                    if !self.walls[down] {
+                    if self.walls[down] == 0 {
                         self.advections[idx].1 -=
                             (pressures[down] - pressures[idx]) / self.cell_size as f64;
                     } else {
@@ -304,7 +294,7 @@ impl Grid {
 
         let left = if x > 0 {
             let neighbor_idx = y * self.width + (x - 1);
-            if !self.walls[neighbor_idx] {
+            if self.walls[neighbor_idx] == 0 {
                 Some((values_grid[neighbor_idx], idx - 1))
             } else {
                 None
@@ -314,7 +304,7 @@ impl Grid {
         };
         let right = if x + 1 < self.width {
             let neighbor_idx = y * self.width + (x + 1);
-            if !self.walls[neighbor_idx] {
+            if self.walls[neighbor_idx] == 0 {
                 Some((values_grid[neighbor_idx], idx + 1))
             } else {
                 None
@@ -324,7 +314,7 @@ impl Grid {
         };
         let up = if y > 0 {
             let neighbor_idx = (y - 1) * self.width + x;
-            if !self.walls[neighbor_idx] {
+            if self.walls[neighbor_idx] == 0 {
                 Some((values_grid[neighbor_idx], idx - self.width))
             } else {
                 None
@@ -334,7 +324,7 @@ impl Grid {
         };
         let down = if y + 1 < self.height {
             let neighbor_idx = (y + 1) * self.width + x;
-            if !self.walls[neighbor_idx] {
+            if self.walls[neighbor_idx] == 0 {
                 Some((values_grid[neighbor_idx], idx + self.width))
             } else {
                 None
@@ -344,4 +334,144 @@ impl Grid {
         };
         [left, right, up, down]
     }
+}
+
+impl Grid for CpuGrid {
+    fn width(&self) -> usize {
+        self.width
+    }
+    fn height(&self) -> usize {
+        self.height
+    }
+    fn cell_size(&self) -> usize {
+        self.cell_size
+    }
+    fn draw_mode(&self) -> &DrawMode {
+        &self.draw_mode
+    }
+    fn draw_intensity(&self) -> f64 {
+        self.draw_intensity
+    }
+    fn concentrations(&self) -> &[f64] {
+        &self.concentrations
+    }
+    fn walls(&self) -> &[u8] {
+        &self.walls
+    }
+    fn set_draw_mode(&mut self) {
+        match self.draw_mode {
+            DrawMode::Gas => self.draw_mode = DrawMode::Source,
+            DrawMode::Source => self.draw_mode = DrawMode::Sink,
+            DrawMode::Sink => self.draw_mode = DrawMode::Advection,
+            DrawMode::Advection => self.draw_mode = DrawMode::Stopper,
+            DrawMode::Stopper => self.draw_mode = DrawMode::Gas,
+        }
+    }
+    fn set_draw_intensity(&mut self, intensity: f64) {
+        self.draw_intensity = (self.draw_intensity + intensity).clamp(0.0, 1.0);
+    }
+    fn clear(&mut self) {
+        self.concentrations.fill(0.0);
+        self.concentrations_scratch.fill(0.0);
+        self.sources.fill(0.0);
+        self.advections.fill((0.0, 0.0));
+        self.advections_scratch.fill((0.0, 0.0));
+        self.walls.fill(0);
+    }
+
+    fn update(&mut self, diffusion_coefficient: f64, delta: f64) {
+        self.project();
+        let mut next = self.concentrations.clone();
+        let advections = self.get_advections(delta);
+
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let idx = y * self.width + x;
+                if self.walls[idx] == 1 {
+                    next[idx] = 0.0;
+                    continue;
+                }
+                let source_rate = self.sources[idx];
+                let advection = advections[idx];
+
+                let neighbors = self.get_neighbors(idx, &advections);
+                let mut neighbor_sum = 0.0;
+                let mut fluid_count = 0.0;
+
+                for neighbor in neighbors.iter() {
+                    if let Some((value, idx)) = neighbor {
+                        if self.walls[*idx] == 0 {
+                            neighbor_sum += value;
+                        } else {
+                            neighbor_sum += advection;
+                        }
+                        fluid_count += 1.0;
+                    }
+                }
+
+                let computed_concentration = advection
+                    + diffusion_coefficient * delta * (neighbor_sum - fluid_count * advection)
+                        / (self.cell_size * self.cell_size) as f64
+                    + source_rate;
+
+                if computed_concentration > 1.0 {
+                    next[idx] = 1.0;
+                } else if computed_concentration < 1e-4 {
+                    next[idx] = 0.0;
+                } else {
+                    next[idx] = computed_concentration;
+                }
+            }
+        }
+
+        self.concentrations = next;
+    }
+
+    fn inject(
+        &mut self,
+        start_x: usize,
+        start_y: usize,
+        prev_cell_x: usize,
+        prev_cell_y: usize,
+        delta: f64,
+    ) {
+        if start_x >= self.width || start_y >= self.height {
+            return;
+        }
+
+        let idx = start_y * self.width + start_x;
+        match self.draw_mode {
+            DrawMode::Gas => {
+                self.concentrations[idx] = self.draw_intensity.clamp(0.0, 1.0);
+            }
+            DrawMode::Source | DrawMode::Sink => {
+                let rate = if matches!(self.draw_mode, DrawMode::Source) {
+                    self.draw_intensity.abs() / 100.0
+                } else {
+                    -self.draw_intensity.abs() / 100.0
+                };
+                self.sources[idx] += rate;
+            }
+            DrawMode::Advection => {
+                let dx = start_x as f64 - prev_cell_x as f64;
+                let dy = start_y as f64 - prev_cell_y as f64;
+                let strength = 5.0;
+                let vel = (dx * strength, dy * strength);
+                let max_vel = self.cell_size as f64 / delta * 0.5;
+
+                self.advections[idx].0 = (self.advections[idx].0 + vel.0).clamp(-max_vel, max_vel);
+                self.advections[idx].1 = (self.advections[idx].1 + vel.1).clamp(-max_vel, max_vel);
+            }
+            DrawMode::Stopper => self.walls[idx] = 0,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum DrawMode {
+    Gas,
+    Source,
+    Sink,
+    Advection,
+    Stopper,
 }

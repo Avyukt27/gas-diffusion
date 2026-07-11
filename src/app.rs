@@ -127,7 +127,6 @@ impl ApplicationHandler<State> for App {
                 button,
                 ..
             } => state.handle_mouse_click(click_state, button),
-            WindowEvent::MouseWheel { delta, .. } => state.handle_mouse_wheel(delta),
             _ => {}
         }
     }
