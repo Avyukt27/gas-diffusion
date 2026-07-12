@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::grid::{DrawMode, Grid};
 
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct GpuCell {
     concentration: f32,
@@ -18,6 +18,8 @@ struct Uniforms {
     diffusion_coefficient: f32,
     width: u32,
     height: u32,
+    cell_size: f32,
+    padding: [f32; 3],
 }
 
 pub struct GpuGrid {
@@ -42,7 +44,6 @@ pub struct GpuGrid {
     project_gradient_pipeline: wgpu::ComputePipeline,
     advect_diffusion_pipeline: wgpu::ComputePipeline,
 
-    bind_group_layout: wgpu::BindGroupLayout,
     bind_group_a: wgpu::BindGroup,
     bind_group_b: wgpu::BindGroup,
 
@@ -84,27 +85,27 @@ impl GpuGrid {
             mapped_at_creation: false,
         });
         let sources = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Grid Buffer B"),
+            label: Some("Grid Sources Buffer"),
             size: grid_buffer_bytes,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
         let pressures = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Grid Buffer B"),
+            label: Some("Grid Pressures Buffer"),
             size: grid_buffer_bytes,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
         let divergences = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Grid Buffer B"),
+            label: Some("Grid Divergences Buffer"),
             size: grid_buffer_bytes,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
         let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Grid Buffer B"),
-            size: grid_buffer_bytes,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            label: Some("Uniforms Buffer"),
+            size: std::mem::size_of::<Uniforms>() as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
             mapped_at_creation: false,
         });
 
@@ -125,7 +126,7 @@ impl GpuGrid {
                     binding: 1,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
                         min_binding_size: None,
                     },
@@ -145,7 +146,7 @@ impl GpuGrid {
                     binding: 3,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
                         min_binding_size: None,
                     },
@@ -155,7 +156,7 @@ impl GpuGrid {
                     binding: 4,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
                         min_binding_size: None,
                     },
@@ -165,7 +166,7 @@ impl GpuGrid {
                     binding: 5,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
                         min_binding_size: None,
                     },
@@ -301,7 +302,6 @@ impl GpuGrid {
             project_jacobi_pipeline,
             project_gradient_pipeline,
             advect_diffusion_pipeline,
-            bind_group_layout,
             bind_group_a,
             bind_group_b,
             iteration_toggle: false,
@@ -419,6 +419,8 @@ impl Grid for GpuGrid {
             diffusion_coefficient: diffusion_coefficient as f32,
             width: self.width as u32,
             height: self.height as u32,
+            cell_size: self.cell_size as f32,
+            padding: [0.0; 3],
         };
         self.queue
             .write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&uniforms));
@@ -447,7 +449,7 @@ impl Grid for GpuGrid {
             compute_pass.set_bind_group(0, current_bind_group, &[]);
             compute_pass.dispatch_workgroups(workgroups_x as u32, workgroups_y as u32, 1u32);
         }
-        {
+        for _ in 0..100 {
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Jacobi Compute Pass"),
                 timestamp_writes: None,

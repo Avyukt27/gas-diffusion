@@ -8,6 +8,7 @@ pub struct Renderer {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
+    adapter: wgpu::Adapter,
     config: wgpu::SurfaceConfiguration,
 
     bind_group_layout: wgpu::BindGroupLayout,
@@ -198,6 +199,7 @@ impl Renderer {
             surface,
             device,
             queue,
+            adapter,
             config,
             bind_group_layout,
             bind_group,
@@ -377,13 +379,14 @@ impl Renderer {
             });
         }
     }
-}
 
-impl Renderer {
     pub fn device(&self) -> Arc<wgpu::Device> {
         Arc::new(self.device.clone())
     }
     pub fn queue(&self) -> Arc<wgpu::Queue> {
         Arc::new(self.queue.clone())
+    }
+    pub fn adapter(&self) -> Arc<wgpu::Adapter> {
+        Arc::new(self.adapter.clone())
     }
 }

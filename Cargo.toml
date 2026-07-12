@@ -17,6 +17,7 @@ crate-type = ["rlib", "cdylib"]
 anyhow = "1.0.103"
 bytemuck = "1.25.0"
 env_logger = "0.10"
+image = { version = "0.25.10", features = ["png"] }
 log = "0.4"
 pollster = "0.4.0"
 wgpu = "30.0"

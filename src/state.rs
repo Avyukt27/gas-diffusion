@@ -8,7 +8,7 @@ use winit::{
     window::Window,
 };
 
-use crate::{cpu_grid::CpuGrid, grid::Grid, renderer::Renderer};
+use crate::{cpu_grid::CpuGrid, gpu_grid::GpuGrid, grid::Grid, renderer::Renderer};
 
 pub const WIDTH: usize = 800;
 pub const HEIGHT: usize = 600;
@@ -16,24 +16,52 @@ pub const CELL_SIZE: usize = 10;
 const DIFFUSION: f64 = 2.0;
 
 pub struct State {
-    pub window: Arc<Window>,
-    pub delta: f64,
-    pub renderer: Renderer,
-    pub grid: CpuGrid,
+    window: Arc<Window>,
+    delta: f64,
+    renderer: Renderer,
+    grid: Box<dyn Grid>,
 
-    pub mouse_down: bool,
-    pub prev_mouse_position: PhysicalPosition<f64>,
-    pub mouse_position: PhysicalPosition<f64>,
+    mouse_down: bool,
+    prev_mouse_position: PhysicalPosition<f64>,
+    mouse_position: PhysicalPosition<f64>,
 }
 
 impl State {
     pub async fn new(window: Arc<Window>, renderer: Renderer) -> anyhow::Result<Self> {
+        let grid: Box<dyn Grid>;
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            grid = Box::new(CpuGrid::new(WIDTH, HEIGHT, CELL_SIZE));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let device = renderer.device();
+            let queue = renderer.queue();
+            let adapter = renderer.adapter();
+
+            let downlevel_caps = adapter.get_downlevel_capabilities();
+            let supports_compute = downlevel_caps
+                .flags
+                .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS);
+            if supports_compute {
+                grid = Box::new(GpuGrid::new(
+                    WIDTH,
+                    HEIGHT,
+                    CELL_SIZE,
+                    device.clone(),
+                    queue.clone(),
+                ));
+            } else {
+                grid = Box::new(CpuGrid::new(WIDTH, HEIGHT, CELL_SIZE));
+            }
+        }
+
         Ok(Self {
             window,
             delta: 1.0,
             renderer,
-            grid: CpuGrid::new(WIDTH, HEIGHT, CELL_SIZE),
-
+            grid,
             mouse_down: false,
             prev_mouse_position: PhysicalPosition::new(0.0, 0.0),
             mouse_position: PhysicalPosition::new(0.0, 0.0),
@@ -109,5 +137,9 @@ impl State {
             }
         }
         self.prev_mouse_position = position;
+    }
+
+    pub fn window(&self) -> Arc<Window> {
+        self.window.clone()
     }
 }

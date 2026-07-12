@@ -3,6 +3,7 @@ struct Uniforms {
     diffusion_coefficient: f32,
     width: u32,
     height: u32,
+    cell_size: f32,
 }
 
 struct Cell {
@@ -60,11 +61,11 @@ fn compute_divergence(@builtin(global_invocation_id) id: vec3<u32>) {
     var v_up = 0.0;
     if input_grid[get_idx(x, y - 1u)].wall == 0u { v_up = input_grid[get_idx(x, y - 1u)].advection_y; }
 
-    divergences[idx] = (u - u_left) + (v - v_up);
+    divergences[idx] = (u - u_left) / uniforms.cell_size + (v - v_up) / uniforms.cell_size;
 }
 
 @compute @workgroup_size(16, 16)
-fn solve_pressure(@builtin(global_invocation_id) id: vec3<u32>) {
+fn solve_pressures(@builtin(global_invocation_id) id: vec3<u32>) {
     let x = id.x;
     let y = id.y;
     if x == 0u || x >= uniforms.width - 1u || y == 0u || y >= uniforms.height - 1u { return; }
@@ -86,7 +87,7 @@ fn solve_pressure(@builtin(global_invocation_id) id: vec3<u32>) {
     if input_grid[get_idx(x, y + 1u)].wall == 0u { neighbor_sum += p_down;  fluid_count += 1.0; }
 
     if fluid_count > 0.0 {
-        pressures[idx] = (neighbor_sum - divergences[idx]) / fluid_count;
+        pressures[idx] = (neighbor_sum - uniforms.cell_size * uniforms.cell_size * divergences[idx]) / fluid_count;
     }
 }
 
@@ -105,7 +106,7 @@ fn subtract_gradient(@builtin(global_invocation_id) id: vec3<u32>) {
 
     if x < uniforms.width - 1u {
         if input_grid[get_idx(x + 1u, y)].wall == 0u {
-            output_grid[idx].advection_x -= pressures[get_idx(x + 1u, y)] - pressures[idx];
+            output_grid[idx].advection_x -= (pressures[get_idx(x + 1u, y)] - pressures[idx]) / uniforms.cell_size;
         } else {
             output_grid[idx].advection_x = 0.0;
         }
@@ -113,7 +114,7 @@ fn subtract_gradient(@builtin(global_invocation_id) id: vec3<u32>) {
 
     if y < uniforms.height - 1u {
         if input_grid[get_idx(x, y + 1u)].wall == 0u {
-            output_grid[idx].advection_y -= pressures[get_idx(x, y + 1u)] - pressures[idx];
+            output_grid[idx].advection_y -= (pressures[get_idx(x, y + 1u)] - pressures[idx]) / uniforms.cell_size;
         } else {
             output_grid[idx].advection_y = 0.0;
         }
@@ -166,7 +167,7 @@ fn advect_diffusion(@builtin(global_invocation_id) id: vec3<u32>) {
     if input_grid[get_idx(x, y - 1u)].wall == 0u { neighbor_sum += c_up; } else { neighbor_sum += advected_concentration; }
     if input_grid[get_idx(x, y + 1u)].wall == 0u { neighbor_sum += c_down; } else { neighbor_sum += advected_concentration; }
 
-    let diffusion = uniforms.diffusion_coefficient * uniforms.delta * (neighbor_sum - 4.0 * advected_concentration);
+    let diffusion = uniforms.diffusion_coefficient * uniforms.delta * (neighbor_sum - 4.0 * advected_concentration) / (uniforms.cell_size * uniforms.cell_size);
 
     let final_concentration = advected_concentration + diffusion + sources[idx];
     output_grid[idx].concentration = clamp(final_concentration, 0.0, 1.0);

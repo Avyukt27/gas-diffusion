@@ -7,7 +7,7 @@ use winit::{
     dpi::LogicalSize,
     event::{KeyEvent, WindowEvent},
     keyboard::PhysicalKey,
-    window::Window,
+    window::{CursorIcon, Icon, Window},
 };
 
 use crate::{
@@ -35,9 +35,17 @@ impl App {
 
 impl ApplicationHandler<State> for App {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let icon = image::load_from_memory(include_bytes!("../favicon.png"))
+            .unwrap()
+            .into_rgba8();
+        let (width, height) = icon.dimensions();
+        let window_icon = Icon::from_rgba(icon.into_raw(), width, height).unwrap();
+
         #[allow(unused_mut)]
         let mut window_attributes = Window::default_attributes()
             .with_title("Diffusion Simulation Window")
+            .with_window_icon(Some(window_icon))
+            .with_cursor(CursorIcon::Crosshair)
             .with_inner_size(LogicalSize::new(WIDTH as f64, HEIGHT as f64))
             .with_resizable(false);
 
@@ -86,10 +94,10 @@ impl ApplicationHandler<State> for App {
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, mut event: State) {
         #[cfg(target_arch = "wasm32")]
         {
-            event.window.request_redraw();
+            event.window().request_redraw();
             event.resize(
-                event.window.inner_size().width,
-                event.window.inner_size().height,
+                event.window().inner_size().width,
+                event.window().inner_size().height,
             );
         }
         self.state = Some(event);
