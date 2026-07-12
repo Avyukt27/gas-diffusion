@@ -47,6 +47,9 @@ pub struct GpuGrid {
     bind_group_b: wgpu::BindGroup,
 
     iteration_toggle: bool,
+
+    concentrations_cache: Vec<f64>,
+    walls_cache: Vec<u8>,
 }
 
 impl GpuGrid {
@@ -257,7 +260,7 @@ impl GpuGrid {
                 label: Some("Jacobi Solver Pipeline"),
                 layout: Some(&pipeline_layout),
                 module: &shader,
-                entry_point: Some("compute_pressures"),
+                entry_point: Some("solve_pressures"),
                 compilation_options: Default::default(),
                 cache: None,
             });
@@ -266,7 +269,7 @@ impl GpuGrid {
                 label: Some("Gradient Subtraction Pipeline"),
                 layout: Some(&pipeline_layout),
                 module: &shader,
-                entry_point: Some("compute_gradients"),
+                entry_point: Some("subtract_gradient"),
                 compilation_options: Default::default(),
                 cache: None,
             });
@@ -302,6 +305,8 @@ impl GpuGrid {
             bind_group_a,
             bind_group_b,
             iteration_toggle: false,
+            concentrations_cache: vec![0.0; cell_count],
+            walls_cache: vec![0; cell_count],
         }
     }
 }
@@ -323,10 +328,59 @@ impl Grid for GpuGrid {
         self.draw_intensity
     }
     fn concentrations(&self) -> &[f64] {
-        &[0.0]
+        let size = (self.width * self.height * 16) as wgpu::BufferAddress;
+        let staging_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Simulation Data Staging Buffer"),
+            size,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Concentration Getter Encoder"),
+            });
+
+        let active_buffer = if self.iteration_toggle {
+            &self.buffer_a
+        } else {
+            &self.buffer_b
+        };
+
+        encoder.copy_buffer_to_buffer(active_buffer, 0, &staging_buffer, 0, size);
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        let buffer_slice = staging_buffer.slice(..);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
+
+        self.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
+
+        if let Ok(Ok(())) = receiver.recv() {
+            let data = buffer_slice.get_mapped_range().unwrap();
+            let cells: &[GpuCell] = bytemuck::cast_slice(&data);
+
+            let conc_ptr = self.concentrations_cache.as_ptr() as *mut f64;
+            let wall_ptr = self.walls_cache.as_ptr() as *mut u8;
+
+            unsafe {
+                for i in 0..cells.len() {
+                    *conc_ptr.add(i) = cells[i].concentration as f64;
+                    *wall_ptr.add(i) = cells[i].wall as u8;
+                }
+            }
+
+            drop(data);
+            staging_buffer.unmap();
+        }
+
+        &self.concentrations_cache
     }
     fn walls(&self) -> &[u8] {
-        &[0]
+        &self.walls_cache
     }
 
     fn set_draw_mode(&mut self) {

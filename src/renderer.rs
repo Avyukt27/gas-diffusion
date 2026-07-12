@@ -5,18 +5,18 @@ use winit::window::Window;
 use crate::state::{CELL_SIZE, HEIGHT, WIDTH};
 
 pub struct Renderer {
-    pub surface: wgpu::Surface<'static>,
-    pub device: wgpu::Device,
-    pub queue: wgpu::Queue,
-    pub config: wgpu::SurfaceConfiguration,
+    surface: wgpu::Surface<'static>,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
 
-    pub bind_group_layout: wgpu::BindGroupLayout,
-    pub bind_group: wgpu::BindGroup,
-    pub texture: wgpu::Texture,
+    bind_group_layout: wgpu::BindGroupLayout,
+    bind_group: wgpu::BindGroup,
+    texture: wgpu::Texture,
 
-    pub render_pipeline: wgpu::RenderPipeline,
+    render_pipeline: wgpu::RenderPipeline,
 
-    pub is_surface_configured: bool,
+    is_surface_configured: bool,
 }
 
 impl Renderer {
@@ -376,5 +376,14 @@ impl Renderer {
                 label: Some("Simulation Bind Group (Resized)"),
             });
         }
+    }
+}
+
+impl Renderer {
+    pub fn device(&self) -> Arc<wgpu::Device> {
+        Arc::new(self.device.clone())
+    }
+    pub fn queue(&self) -> Arc<wgpu::Queue> {
+        Arc::new(self.queue.clone())
     }
 }
