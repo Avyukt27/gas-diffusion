@@ -1,1 +1,4 @@
 /target
+/pkg
+**/*.zip
+Session.vim
