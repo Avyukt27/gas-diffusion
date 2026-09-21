@@ -31,6 +31,10 @@ impl App {
             state: None,
         }
     }
+
+    pub fn state(&self) -> Option<&State> {
+        self.state.as_ref()
+    }
 }
 
 impl ApplicationHandler<State> for App {

@@ -8,7 +8,11 @@ use winit::{
     window::Window,
 };
 
-use crate::{cpu_grid::CpuGrid, gpu_grid::GpuGrid, grid::Grid, renderer::Renderer};
+use crate::{
+    cpu_grid::CpuGrid,
+    grid::{Grid, GridType},
+    renderer::Renderer,
+};
 
 pub const WIDTH: usize = 800;
 pub const HEIGHT: usize = 600;
@@ -19,7 +23,7 @@ pub struct State {
     window: Arc<Window>,
     delta: f64,
     renderer: Renderer,
-    grid: Box<dyn Grid>,
+    grid: GridType,
 
     mouse_down: bool,
     prev_mouse_position: PhysicalPosition<f64>,
@@ -28,34 +32,36 @@ pub struct State {
 
 impl State {
     pub async fn new(window: Arc<Window>, renderer: Renderer) -> anyhow::Result<Self> {
-        let grid: Box<dyn Grid>;
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            grid = Box::new(CpuGrid::new(WIDTH, HEIGHT, CELL_SIZE));
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let device = renderer.device();
-            let queue = renderer.queue();
-            let adapter = renderer.adapter();
-
-            let downlevel_caps = adapter.get_downlevel_capabilities();
-            let supports_compute = downlevel_caps
-                .flags
-                .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS);
-            if supports_compute {
-                grid = Box::new(GpuGrid::new(
-                    WIDTH,
-                    HEIGHT,
-                    CELL_SIZE,
-                    device.clone(),
-                    queue.clone(),
-                ));
-            } else {
-                grid = Box::new(CpuGrid::new(WIDTH, HEIGHT, CELL_SIZE));
+        let grid: GridType = {
+            #[cfg(target_arch = "wasm32")]
+            {
+                GridType::Cpu(CpuGrid::new(WIDTH, HEIGHT, CELL_SIZE))
             }
-        }
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let device = renderer.device();
+                let queue = renderer.queue();
+                let adapter = renderer.adapter();
+
+                let downlevel_caps = adapter.get_downlevel_capabilities();
+                let supports_compute = downlevel_caps
+                    .flags
+                    .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS);
+                if supports_compute {
+                    use crate::gpu_grid::GpuGrid;
+
+                    GridType::Gpu(GpuGrid::new(
+                        WIDTH,
+                        HEIGHT,
+                        CELL_SIZE,
+                        device.clone(),
+                        queue.clone(),
+                    ))
+                } else {
+                    GridType::Cpu(CpuGrid::new(WIDTH, HEIGHT, CELL_SIZE))
+                }
+            }
+        };
 
         Ok(Self {
             window,
@@ -141,5 +147,9 @@ impl State {
 
     pub fn window(&self) -> Arc<Window> {
         self.window.clone()
+    }
+
+    pub fn grid(&self) -> &impl Grid {
+        &self.grid
     }
 }
